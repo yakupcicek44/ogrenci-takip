@@ -95,6 +95,14 @@ const Assessments = {
     });
   },
 
+  // Sınıfın o dönemdeki genel ortalaması — notu olan öğrenciler üzerinden (boş notlu
+  // öğrenciler ortalamayı aşağı çekmesin diye hesaba hiç katılmaz).
+  classAverage(sinif, termId) {
+    const vals = this.rankInClass(sinif, termId).map((r) => r.average).filter((v) => v !== null);
+    if (!vals.length) return null;
+    return Utils.round1(vals.reduce((a, b) => a + b, 0) / vals.length);
+  },
+
   weightsSum(weights) {
     return Object.values(weights).reduce((a, b) => a + Number(b || 0), 0);
   },

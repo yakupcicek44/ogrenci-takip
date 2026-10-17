@@ -211,9 +211,13 @@ const HomeworkView = {
     document.getElementById('hw-filter-sinif').addEventListener('change', renderAssignmentList);
 
     renderStudentCheckboxes();
-    renderAssignmentList();
 
     const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const durumParam = params.get('durum');
+    if (durumParam) document.getElementById('hw-filter-durum').value = durumParam;
+
+    renderAssignmentList();
+
     if (params.get('yeni') === '1') {
       document.getElementById('new-hw-ad').focus();
     }

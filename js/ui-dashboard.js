@@ -1,4 +1,8 @@
-// Ana Ekran
+// Ana Ekran — gerçek veriyle beslenen özet + grafikler
+const DASHBOARD_CHART_COLORS = {
+  primary: '#2563eb', accent: '#7c3aed', success: '#16a34a', warning: '#f59e0b', danger: '#dc2626', muted: '#94a3b8',
+};
+
 const DashboardView = {
   html() {
     const students = State.getActiveStudents();
@@ -11,14 +15,11 @@ const DashboardView = {
     const enYeniYedek = [sonYedek, sonDriveYedek].filter(Boolean).sort().pop();
     const yedekUyarisiGoster = !enYeniYedek || (Date.now() - new Date(enYeniYedek).getTime()) > 7 * 24 * 3600 * 1000;
 
-    // Basit gelişim özeti: son 5 deneme sonucuna göre genel sınıf ortalaması trendi
-    const allExams = State.data.mockExams.slice().sort((a, b) => (a.tarih || '').localeCompare(b.tarih || ''));
-    const sonDenemeOzet = allExams.length
-      ? `Son deneme: ${allExams[allExams.length - 1].denemeAdi} (${Utils.formatDateTR(allExams[allExams.length - 1].tarih)})`
-      : 'Henüz deneme sonucu girilmedi.';
-
     let onboardingGorundu = true;
     try { onboardingGorundu = localStorage.getItem('ogrenciTakipOnboarding') === '1'; } catch (e) { /* no-op */ }
+
+    const siniflar = State.getSiniflar();
+    const ilkDonem = State.getTermsSorted()[0];
 
     return pageWrap('Ana Sayfa', `
       ${!onboardingGorundu ? `
@@ -81,28 +82,29 @@ const DashboardView = {
         `;
       })()}
 
-      ${(() => {
-        const siniflar = State.getSiniflar();
-        if (!siniflar.length) return '';
-        return `
-          <div class="card">
-            <div class="card-title">Sınıf Dağılımı</div>
-            <div class="list">
-              ${siniflar.map((s) => {
-                const sayilar = Students.countBySinif(s);
-                return `<a href="#/ogrenciler?sinif=${encodeURIComponent(s)}" class="list-item">
-                  <div class="list-item-main"><div class="list-item-title">${Utils.escapeHtml(s)}</div></div>
-                  <strong>${sayilar.aktif}${sayilar.pasif ? ' <span class="muted small">(+' + sayilar.pasif + ' pasif)</span>' : ''}</strong>
-                </a>`;
-              }).join('')}
-            </div>
-          </div>
-        `;
-      })()}
+      ${State.data.homeworkAssignments.length ? `
+        <div class="card">
+          <div class="card-title">Ödev Durumu Dağılımı</div>
+          <canvas id="chart-odev-durum" height="180"></canvas>
+        </div>
+      ` : ''}
+
+      ${siniflar.length ? `
+        <div class="card">
+          <div class="card-title">Sınıf Dağılımı</div>
+          <canvas id="chart-sinif-dagilim" height="180"></canvas>
+          <p class="muted small" style="margin-top:6px;">Bir sütuna dokunursan o sınıfın öğrenci listesi açılır.</p>
+        </div>
+      ` : ''}
+
+      ${siniflar.length && ilkDonem ? `
+        <div class="card">
+          <div class="card-title">Sınıf Ortalamaları (${Utils.escapeHtml(ilkDonem.ad)})</div>
+          <canvas id="chart-sinif-ortalama" height="180"></canvas>
+        </div>
+      ` : ''}
 
       ${(() => {
-        // "Eksik bilgi": hiç not, gözlem veya devamsızlık kaydı olmayan aktif öğrenciler —
-        // öğretmenin henüz dokunmadığı, dikkat gerektiren kayıtlar.
         const eksikler = students.filter((s) => {
           const hasAssessment = State.data.assessments.some((a) => a.studentId === s.id && !Utils.isEmptyGrade(a.puan));
           const hasObs = State.data.observations.some((o) => o.studentId === s.id);
@@ -116,11 +118,6 @@ const DashboardView = {
           </div>
         `;
       })()}
-
-      <div class="card">
-        <div class="card-title">Gelişim Özeti</div>
-        <p class="muted">${Utils.escapeHtml(sonDenemeOzet)}</p>
-      </div>
 
       ${(() => {
         const sonGozlemler = [...State.data.observations].sort((a, b) => (b.tarih || '').localeCompare(a.tarih || '')).slice(0, 5);
@@ -160,5 +157,82 @@ const DashboardView = {
       try { localStorage.setItem('ogrenciTakipOnboarding', '1'); } catch (e) { /* no-op */ }
       Router.render();
     });
+
+    // --- Ödev Durumu Dağılımı (donut) ---
+    const odevCanvas = document.getElementById('chart-odev-durum');
+    if (odevCanvas) {
+      const sayilar = Homework.DURUMLAR.map((d) => State.data.homeworkAssignments.filter((a) => a.durum === d).length);
+      new Chart(odevCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: Homework.DURUMLAR,
+          datasets: [{
+            data: sayilar,
+            backgroundColor: [DASHBOARD_CHART_COLORS.accent, DASHBOARD_CHART_COLORS.success, DASHBOARD_CHART_COLORS.danger, DASHBOARD_CHART_COLORS.warning],
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+          onClick: (evt, elements) => {
+            if (!elements.length) return;
+            const durum = Homework.DURUMLAR[elements[0].index];
+            location.hash = `#/odev-atama?durum=${encodeURIComponent(durum)}`;
+          },
+        },
+      });
+    }
+
+    // --- Sınıf Dağılımı (bar, tıklanınca öğrenci listesine gider) ---
+    const sinifCanvas = document.getElementById('chart-sinif-dagilim');
+    if (sinifCanvas) {
+      const siniflar = State.getSiniflar();
+      const sayilar = siniflar.map((s) => Students.countBySinif(s).aktif);
+      new Chart(sinifCanvas, {
+        type: 'bar',
+        data: { labels: siniflar, datasets: [{ data: sayilar, backgroundColor: DASHBOARD_CHART_COLORS.primary, borderRadius: 6 }] },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+          onClick: (evt, elements) => {
+            if (!elements.length) return;
+            location.hash = `#/ogrenciler?sinif=${encodeURIComponent(siniflar[elements[0].index])}`;
+          },
+        },
+      });
+    }
+
+    // --- Sınıf Ortalamaları (bar) ---
+    const ortalamaCanvas = document.getElementById('chart-sinif-ortalama');
+    if (ortalamaCanvas) {
+      const siniflar = State.getSiniflar();
+      const ilkDonem = State.getTermsSorted()[0];
+      const ortalamalar = siniflar.map((s) => Assessments.classAverage(s, ilkDonem.id));
+      new Chart(ortalamaCanvas, {
+        type: 'bar',
+        data: {
+          labels: siniflar,
+          datasets: [{
+            data: ortalamalar,
+            backgroundColor: DASHBOARD_CHART_COLORS.accent,
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => ctx.raw === null ? 'Not girilmedi' : `Ortalama: ${ctx.raw}` } },
+          },
+          scales: { y: { beginAtZero: true, max: 100 } },
+          onClick: (evt, elements) => {
+            if (!elements.length) return;
+            location.hash = `#/ogrenciler?sinif=${encodeURIComponent(siniflar[elements[0].index])}`;
+          },
+        },
+      });
+    }
   },
 };
