@@ -5,6 +5,7 @@ const ASSISTANT_TABS = [
   { key: 'hatirlaticilar', label: 'Hatırlatıcılar' },
   { key: 'notlar', label: 'Notlar' },
   { key: 'belgeler', label: 'Belgeler' },
+  { key: 'ders-programi', label: 'Ders Programı' },
 ];
 
 const AssistantView = {
@@ -21,7 +22,7 @@ const AssistantView = {
   mount(params) {
     const tab = params.tab || 'gorevler';
     const container = document.getElementById('assistant-tab-content');
-    const renderers = { gorevler: renderGorevlerTab, hatirlaticilar: renderHatirlaticilarTab, notlar: renderNotlarTab, belgeler: renderBelgelerTab };
+    const renderers = { gorevler: renderGorevlerTab, hatirlaticilar: renderHatirlaticilarTab, notlar: renderNotlarTab, belgeler: renderBelgelerTab, 'ders-programi': renderDersProgramiTab };
     const renderer = renderers[tab] || renderGorevlerTab;
     container.innerHTML = renderer.html();
     renderer.mount();
@@ -494,5 +495,275 @@ const renderBelgelerTab = {
 
     document.getElementById('doc-filter-kategori').addEventListener('change', renderList);
     renderList();
+  },
+};
+
+// ---- Ders Programı (haftalık, tekrar eden şablon + bu haftaya özel istisna) ----
+const renderDersProgramiTab = {
+  html() {
+    return `
+      <div class="toolbar">
+        <button class="btn btn-secondary btn-sm" id="dp-prev-week">‹ Önceki</button>
+        <div id="dp-week-label" class="muted" style="text-align:center;flex:1;font-weight:650;align-self:center;"></div>
+        <button class="btn btn-secondary btn-sm" id="dp-next-week">Sonraki ›</button>
+      </div>
+      <div id="dp-week-grid"></div>
+      <button class="btn btn-primary btn-block" id="dp-add-slot" style="margin-top:10px;">+ Ders Ekle</button>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">Mesai Analizi</div>
+        <div class="kv-row"><span>Bu Hafta</span><strong id="dp-week-total">-</strong></div>
+        <div class="kv-row"><span>Bu Ay</span><strong id="dp-month-total">-</strong></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Ek Ders Saati</div>
+        <p class="muted small">Düzenli programa dahil olmayan telafi dersi, nöbet gibi saatleri buradan ekleyip mesai hesabına dahil edebilirsin.</p>
+        <button class="btn btn-secondary btn-block" id="dp-add-ekders">+ Ek Ders Saati Ekle</button>
+        <div id="dp-ekders-list" class="list" style="margin-top:10px;"></div>
+      </div>
+    `;
+  },
+
+  mount() {
+    let currentMonday = Schedule.weekMonday(Utils.todayISO());
+
+    const openTemplateForm = (existing) => {
+      Modal.open(`
+        <div class="modal-header">${existing ? 'Ders Şablonunu Düzenle' : 'Yeni Ders Ekle'}</div>
+        <div class="modal-body">
+          <p class="muted small">${existing ? 'Değişiklik tüm haftaları etkiler.' : 'Her hafta otomatik olarak tekrar eder.'}</p>
+          <label class="field-label">Gün *</label>
+          <select id="dp-gun" class="input">
+            ${Schedule.GUNLER.slice(1).map((g, i) => `<option value="${i + 1}" ${existing?.gun === i + 1 ? 'selected' : ''}>${g}</option>`).join('')}
+          </select>
+          <div class="field-row-2">
+            <div><label class="field-label">Başlangıç Saati *</label><input type="time" id="dp-baslangic" class="input" value="${existing?.baslangicSaati || ''}"></div>
+            <div><label class="field-label">Bitiş Saati *</label><input type="time" id="dp-bitis" class="input" value="${existing?.bitisSaati || ''}"></div>
+          </div>
+          <label class="field-label">Sınıf *</label>
+          <input type="text" id="dp-sinif" class="input" placeholder="Örn: 10/A" value="${Utils.escapeHtml(existing?.sinif || '')}">
+          <label class="field-label">Ders Adı (opsiyonel)</label>
+          <input type="text" id="dp-ders" class="input" value="${Utils.escapeHtml(existing?.ders || '')}">
+          <div id="dp-slot-errors" class="form-errors"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="dp-slot-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="dp-slot-save">Kaydet</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#dp-slot-cancel').onclick = () => Modal.close();
+          root.querySelector('#dp-slot-save').onclick = async () => {
+            const form = {
+              gun: root.querySelector('#dp-gun').value,
+              baslangicSaati: root.querySelector('#dp-baslangic').value,
+              bitisSaati: root.querySelector('#dp-bitis').value,
+              sinif: root.querySelector('#dp-sinif').value,
+              ders: root.querySelector('#dp-ders').value,
+            };
+            const result = existing ? await Schedule.updateSlot(existing.id, form) : await Schedule.createSlot(form);
+            if (!result.ok) {
+              root.querySelector('#dp-slot-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
+              return;
+            }
+            Modal.close();
+            Utils.toast('Ders programı güncellendi.', 'success');
+            renderWeek();
+          };
+        },
+      });
+    };
+
+    const openOccurrenceModal = (templateId, tarih) => {
+      const tpl = State.data.dersProgrami.find((s) => s.id === templateId);
+      if (!tpl) return;
+      const haftaBasi = Schedule.weekMonday(tarih);
+      const ex = Schedule.getException(templateId, haftaBasi);
+      const iptalEdildi = !!(ex && ex.tur === 'iptal');
+      const efektifBaslangic = ex?.baslangicSaati || tpl.baslangicSaati;
+      const efektifBitis = ex?.bitisSaati || tpl.bitisSaati;
+      const efektifSinif = ex?.sinif || tpl.sinif;
+
+      Modal.open(`
+        <div class="modal-header">${Schedule.GUNLER[tpl.gun]} · ${Utils.formatDateTR(tarih)}</div>
+        <div class="modal-body">
+          <p class="muted small">Düzenli program: her ${Schedule.GUNLER[tpl.gun]} ${tpl.baslangicSaati}-${tpl.bitisSaati} · ${Utils.escapeHtml(tpl.sinif)}${tpl.ders ? ' · ' + Utils.escapeHtml(tpl.ders) : ''}</p>
+
+          ${iptalEdildi ? `
+            <div class="alert alert-warning">Bu hafta İPTAL edilmiş.</div>
+            <button class="btn btn-secondary btn-block" id="dp-undo-cancel">İptali Geri Al</button>
+          ` : `
+            <button class="btn btn-danger btn-block" id="dp-cancel-week">Bu Hafta İptal Et</button>
+          `}
+
+          <div class="card" style="box-shadow:none;margin-top:12px;">
+            <div class="card-title">Bu Hafta İçin Saat/Sınıf Değiştir</div>
+            <div class="field-row-2">
+              <div><label class="field-label">Başlangıç</label><input type="time" id="dp-ex-baslangic" class="input" value="${efektifBaslangic}"></div>
+              <div><label class="field-label">Bitiş</label><input type="time" id="dp-ex-bitis" class="input" value="${efektifBitis}"></div>
+            </div>
+            <label class="field-label">Sınıf</label>
+            <input type="text" id="dp-ex-sinif" class="input" value="${Utils.escapeHtml(efektifSinif)}">
+            <div id="dp-ex-errors" class="form-errors"></div>
+            <button class="btn btn-secondary btn-block" id="dp-save-change" style="margin-top:8px;">Bu Hafta İçin Kaydet</button>
+            ${ex && ex.tur === 'degisiklik' ? '<button class="btn btn-secondary btn-block" id="dp-clear-change" style="margin-top:6px;">Değişikliği Kaldır (Programa Dön)</button>' : ''}
+          </div>
+
+          <button class="btn btn-secondary btn-block" id="dp-edit-template" style="margin-top:12px;">Şablonu Tamamen Düzenle (Tüm Haftaları Etkiler)</button>
+          <button class="btn btn-danger btn-block" id="dp-delete-template" style="margin-top:8px;">Şablonu Sil (Tüm Haftalardan Kaldırır)</button>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="dp-close">Kapat</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#dp-close').onclick = () => Modal.close();
+          root.querySelector('#dp-cancel-week')?.addEventListener('click', async () => {
+            await Schedule.setCancel(templateId, haftaBasi);
+            Modal.close();
+            renderWeek();
+          });
+          root.querySelector('#dp-undo-cancel')?.addEventListener('click', async () => {
+            await Schedule.clearException(templateId, haftaBasi);
+            Modal.close();
+            renderWeek();
+          });
+          root.querySelector('#dp-save-change').onclick = async () => {
+            const result = await Schedule.setChange(templateId, haftaBasi, {
+              baslangicSaati: root.querySelector('#dp-ex-baslangic').value,
+              bitisSaati: root.querySelector('#dp-ex-bitis').value,
+              sinif: root.querySelector('#dp-ex-sinif').value,
+            });
+            if (!result.ok) {
+              root.querySelector('#dp-ex-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
+              return;
+            }
+            Modal.close();
+            Utils.toast('Bu haftaya özel değişiklik kaydedildi.', 'success');
+            renderWeek();
+          };
+          root.querySelector('#dp-clear-change')?.addEventListener('click', async () => {
+            await Schedule.clearException(templateId, haftaBasi);
+            Modal.close();
+            renderWeek();
+          });
+          root.querySelector('#dp-edit-template').onclick = () => { Modal.close(); openTemplateForm(tpl); };
+          root.querySelector('#dp-delete-template').onclick = async () => {
+            const ok = await Confirm.ask('Bu ders şablonu TÜM haftalardan kalıcı olarak silinecek. Bu işlem geri alınamaz.', { danger: true });
+            if (!ok) return;
+            await Schedule.removeSlot(templateId);
+            Modal.close();
+            renderWeek();
+          };
+        },
+      });
+    };
+
+    const renderWeek = () => {
+      const { start, end } = Schedule.weekRange(currentMonday);
+      document.getElementById('dp-week-label').textContent = `${Utils.formatDateTR(start)} - ${Utils.formatDateTR(end)}`;
+      const occurrences = Schedule.getOccurrencesInRange(start, end);
+      const grid = document.getElementById('dp-week-grid');
+      grid.innerHTML = Schedule.GUNLER.slice(1).map((gunAdi, idx) => {
+        const gunTarihi = Schedule.addDays(currentMonday, idx);
+        const gunOccurrences = occurrences.filter((o) => o.tarih === gunTarihi);
+        return `
+          <div class="card" style="margin-bottom:10px;">
+            <div class="card-title">${gunAdi} · ${Utils.formatDateTR(gunTarihi)}</div>
+            ${gunOccurrences.length ? gunOccurrences.map((o) => `
+              <div class="list-item" style="${o.iptal ? 'opacity:0.55;' : ''}">
+                <div class="list-item-main">
+                  <div class="list-item-title">${o.baslangicSaati}-${o.bitisSaati} · ${Utils.escapeHtml(o.sinif)}${o.ders ? ' · ' + Utils.escapeHtml(o.ders) : ''}${o.iptal ? ' <span class="badge">İptal</span>' : o.degisti ? ' <span class="badge">Değişti</span>' : ''}</div>
+                  ${o.not ? `<div class="list-item-sub">${Utils.escapeHtml(o.not)}</div>` : ''}
+                </div>
+                <button class="btn btn-secondary btn-sm dp-manage-occurrence" data-template="${o.templateId}" data-tarih="${o.tarih}">Yönet</button>
+              </div>
+            `).join('') : '<p class="muted small">Ders yok.</p>'}
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('dp-week-total').textContent = Schedule.totalHoursInRange(start, end) + ' saat';
+      const ay = Schedule.monthRange(currentMonday.slice(0, 7));
+      document.getElementById('dp-month-total').textContent = Schedule.totalHoursInRange(ay.start, ay.end) + ' saat';
+
+      grid.querySelectorAll('.dp-manage-occurrence').forEach((btn) => {
+        btn.onclick = () => openOccurrenceModal(btn.dataset.template, btn.dataset.tarih);
+      });
+    };
+
+    const renderEkDersList = () => {
+      const list = [...State.data.ekDersSaatleri].sort((a, b) => b.tarih.localeCompare(a.tarih)).slice(0, 20);
+      const container = document.getElementById('dp-ekders-list');
+      if (!list.length) { container.innerHTML = emptyState('Henüz ek ders saati eklenmedi.', '⏱️'); return; }
+      container.innerHTML = list.map((e) => `
+        <div class="list-item" data-id="${e.id}">
+          <div class="list-item-main">
+            <div class="list-item-title">${Utils.formatDateTR(e.tarih)} · ${e.baslangicSaati}-${e.bitisSaati} (${e.saat} saat)</div>
+            ${e.aciklama ? `<div class="list-item-sub">${Utils.escapeHtml(e.aciklama)}</div>` : ''}
+          </div>
+          <button class="btn btn-danger btn-sm dp-ekders-delete" data-id="${e.id}">Sil</button>
+        </div>
+      `).join('');
+      container.querySelectorAll('.dp-ekders-delete').forEach((btn) => {
+        btn.onclick = async () => {
+          const ok = await Confirm.ask('Bu ek ders saati silinsin mi?', { danger: true });
+          if (!ok) return;
+          await Schedule.removeEkDers(btn.dataset.id);
+          renderWeek();
+          renderEkDersList();
+        };
+      });
+    };
+
+    const openEkDersForm = () => {
+      Modal.open(`
+        <div class="modal-header">Ek Ders Saati Ekle</div>
+        <div class="modal-body">
+          <label class="field-label">Tarih *</label>
+          <input type="date" id="dp-ek-tarih" class="input" value="${Utils.todayISO()}">
+          <div class="field-row-2">
+            <div><label class="field-label">Başlangıç *</label><input type="time" id="dp-ek-baslangic" class="input"></div>
+            <div><label class="field-label">Bitiş *</label><input type="time" id="dp-ek-bitis" class="input"></div>
+          </div>
+          <label class="field-label">Açıklama</label>
+          <input type="text" id="dp-ek-aciklama" class="input" placeholder="Örn: Telafi dersi - 10/A">
+          <div id="dp-ek-errors" class="form-errors"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="dp-ek-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="dp-ek-save">Kaydet</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#dp-ek-cancel').onclick = () => Modal.close();
+          root.querySelector('#dp-ek-save').onclick = async () => {
+            const result = await Schedule.addEkDers({
+              tarih: root.querySelector('#dp-ek-tarih').value,
+              baslangicSaati: root.querySelector('#dp-ek-baslangic').value,
+              bitisSaati: root.querySelector('#dp-ek-bitis').value,
+              aciklama: root.querySelector('#dp-ek-aciklama').value,
+            });
+            if (!result.ok) {
+              root.querySelector('#dp-ek-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
+              return;
+            }
+            Modal.close();
+            Utils.toast('Ek ders saati eklendi.', 'success');
+            renderWeek();
+            renderEkDersList();
+          };
+        },
+      });
+    };
+
+    document.getElementById('dp-prev-week').addEventListener('click', () => { currentMonday = Schedule.addDays(currentMonday, -7); renderWeek(); });
+    document.getElementById('dp-next-week').addEventListener('click', () => { currentMonday = Schedule.addDays(currentMonday, 7); renderWeek(); });
+    document.getElementById('dp-add-slot').addEventListener('click', () => openTemplateForm(null));
+    document.getElementById('dp-add-ekders').addEventListener('click', () => openEkDersForm());
+
+    renderWeek();
+    renderEkDersList();
   },
 };

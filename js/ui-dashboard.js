@@ -82,6 +82,23 @@ const DashboardView = {
         `;
       })()}
 
+      ${(() => {
+        const bugun = Utils.todayISO();
+        const dow = new Date(bugun + 'T00:00:00').getDay();
+        if (dow < 1 || dow > 5 || !State.data.dersProgrami.length) return '';
+        const bugunler = Schedule.getOccurrencesInRange(bugun, bugun);
+        if (!bugunler.length) return '';
+        return `
+          <div class="card">
+            <div class="card-title">Bugünün Ders Programı</div>
+            <ul class="simple-list">
+              ${bugunler.map((o) => `<li>${o.baslangicSaati}-${o.bitisSaati} · ${Utils.escapeHtml(o.sinif)}${o.iptal ? ' <strong style="color:var(--danger)">(iptal)</strong>' : ''}</li>`).join('')}
+            </ul>
+            <a href="#/asistan/ders-programi" class="btn btn-secondary btn-block" style="margin-top:8px;">Ders Programını Aç</a>
+          </div>
+        `;
+      })()}
+
       ${State.data.homeworkAssignments.length ? `
         <div class="card">
           <div class="card-title">Ödev Durumu Dağılımı</div>

@@ -17,6 +17,9 @@ const State = {
     attendance: [],
     documents: [],
     trash: [],
+    dersProgrami: [],
+    dersProgramiIstisna: [],
+    ekDersSaatleri: [],
     settings: null,
   },
 
@@ -39,6 +42,9 @@ const State = {
     d.attendance = await DB.getAll('attendance');
     d.documents = await DB.getAll('documents');
     d.trash = await DB.getAll('trash');
+    d.dersProgrami = await DB.getAll('dersProgrami');
+    d.dersProgramiIstisna = await DB.getAll('dersProgramiIstisna');
+    d.ekDersSaatleri = await DB.getAll('ekDersSaatleri');
     const settingsRows = await DB.getAll('settings');
     d.settings = settingsRows.find((s) => s.id === 'main') || null;
 

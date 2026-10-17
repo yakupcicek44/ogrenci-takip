@@ -57,6 +57,9 @@ const ReportsView = {
           <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="ranking" checked> Sıralama</label>
           <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="attendance"> Devamsızlık %</label>
           <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="homework"> Ödev Tamamlama</label>
+          <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="books"> Kitap Okuma</label>
+          <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="exams"> Deneme Ortalaması</label>
+          <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="observations"> Gözlem Sayısı</label>
         </div>
         <div class="button-row">
           <button class="btn btn-primary" id="report-sinif-pdf">PDF İndir</button>

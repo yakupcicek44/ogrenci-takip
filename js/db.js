@@ -1,6 +1,6 @@
 // IndexedDB katmanı — tüm kalıcı veri burada tutulur (geçici bellek kullanılmaz)
 const DB_NAME = 'ogrenci-takip-db';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 let dbInstance = null;
 
@@ -99,6 +99,21 @@ function openDB() {
       if (!db.objectStoreNames.contains('trash')) {
         const t = db.createObjectStore('trash', { keyPath: 'id' });
         t.createIndex('store', 'store', { unique: false });
+      }
+
+      // Haftalık Ders Programı: tekrar eden şablon (gün+saat+sınıf) + o haftaya özel
+      // istisnalar (iptal/değişiklik), artı manuel ek ders saatleri (mesai analizine dahil).
+      if (!db.objectStoreNames.contains('dersProgrami')) {
+        const dp = db.createObjectStore('dersProgrami', { keyPath: 'id' });
+        dp.createIndex('gun', 'gun', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('dersProgramiIstisna')) {
+        const dpi = db.createObjectStore('dersProgramiIstisna', { keyPath: 'id' });
+        dpi.createIndex('templateId', 'templateId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('ekDersSaatleri')) {
+        const eds = db.createObjectStore('ekDersSaatleri', { keyPath: 'id' });
+        eds.createIndex('tarih', 'tarih', { unique: false });
       }
 
       // v2 -> v3: eski tek metinlik "gozlemNotlari" alanını kaybetmemek için
@@ -205,7 +220,7 @@ const DB = {
 
   // Tüm store'ları tek bir nesnede döndürür (JSON yedekleme için)
   async exportAll() {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'settings'];
     const result = {};
     for (const n of names) {
       result[n] = await DB.getAll(n);
@@ -215,7 +230,7 @@ const DB = {
 
   // JSON yedekten tüm store'ları geri yükler (önce temizler, sonra yazar)
   async importAll(data) {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'settings'];
     for (const n of names) {
       await DB.clear(n);
       if (Array.isArray(data[n]) && data[n].length) {

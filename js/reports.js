@@ -176,7 +176,7 @@ const Reports = {
     doc.save(`${this._safeFilePart(student.ad)}_rapor.pdf`);
   },
 
-  DEFAULT_CLASS_SECTIONS: { grades: true, ranking: true, attendance: false, homework: false },
+  DEFAULT_CLASS_SECTIONS: { grades: true, ranking: true, attendance: false, homework: false, books: false, exams: false, observations: false },
 
   _classTableSpec(sinif, termId, sections) {
     const opt = { ...this.DEFAULT_CLASS_SECTIONS, ...(sections || {}) };
@@ -186,6 +186,9 @@ const Reports = {
     if (opt.ranking) head.push('Sıra');
     if (opt.attendance) head.push('Devamsızlık %');
     if (opt.homework) head.push('Ödev Tamamlama');
+    if (opt.books) head.push('Kitap (Tamamlanan)');
+    if (opt.exams) head.push('Deneme Ortalaması');
+    if (opt.observations) head.push('Gözlem Sayısı');
 
     const rows = ranking.map((r) => {
       const row = [r.student.ad, r.student.okulNo];
@@ -207,6 +210,18 @@ const Reports = {
         const hw = State.getStudentHomework(r.student.id);
         const tamam = hw.filter((a) => a.durum === 'teslim edildi').length;
         row.push(hw.length ? `${tamam}/${hw.length}` : '-');
+      }
+      if (opt.books) {
+        const books = State.getStudentBooks(r.student.id);
+        const tamam = books.filter((b) => b.durum === 'tamamlandı').length;
+        row.push(books.length ? `${tamam}/${books.length}` : '-');
+      }
+      if (opt.exams) {
+        const puanlar = State.getStudentMockExams(r.student.id).filter((m) => !Utils.isEmptyGrade(m.puan)).map((m) => m.puan);
+        row.push(puanlar.length ? Utils.round1(puanlar.reduce((a, p) => a + p, 0) / puanlar.length) : '-');
+      }
+      if (opt.observations) {
+        row.push(State.getStudentObservations(r.student.id).length);
       }
       return row;
     });
