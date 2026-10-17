@@ -11,6 +11,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Öğrenci Takip">
+  <script>
+    // Koyu/açık tema anında uygulanır (CSS yüklenmeden önce) — aksi halde
+    // koyu moddayken kısa bir an açık renk "çakması" (flash) görülür.
+    try {
+      var _tema = localStorage.getItem('ogrenciTakipTema');
+      if (_tema === 'light' || _tema === 'dark') document.documentElement.setAttribute('data-theme', _tema);
+    } catch (e) {}
+  </script>
   <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
@@ -28,6 +36,7 @@
 
   <script src="./js/db.js"></script>
   <script src="./js/utils.js"></script>
+  <script src="./js/theme.js"></script>
   <script src="./js/state.js"></script>
   <script src="./js/auth.js"></script>
   <script src="./js/students.js"></script>

@@ -76,6 +76,8 @@ function showLogin() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  Theme.apply();
+  Theme.initSystemListener();
   try {
     await State.init();
   } catch (e) {

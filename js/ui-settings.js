@@ -7,6 +7,17 @@ const SettingsView = {
 
     return pageWrap('Ayarlar', `
       <div class="card">
+        <div class="card-title">Görünüm</div>
+        <div class="theme-picker">
+          ${Theme.OPTIONS.map((o) => `
+            <div class="theme-option ${Theme.get() === o.key ? 'active' : ''}" data-theme-option="${o.key}">
+              <span class="theme-option-icon">${o.icon}</span>${o.label}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Not Ağırlıkları</div>
         <p class="muted small">Bunlar varsayılan/örnek değerlerdir — resmi bir notlandırma kuralı değildir. Kendi kuralına göre değiştir. Toplamın 100 olması önerilir.</p>
         <div class="field-row-2">
@@ -82,6 +93,13 @@ const SettingsView = {
   },
 
   mount() {
+    document.querySelectorAll('[data-theme-option]').forEach((el) => {
+      el.addEventListener('click', () => {
+        Theme.set(el.dataset.themeOption);
+        document.querySelectorAll('[data-theme-option]').forEach((x) => x.classList.toggle('active', x === el));
+      });
+    });
+
     const updateToplam = () => {
       const vals = {
         sinav1: Number(document.getElementById('w-sinav1').value || 0),

@@ -3,8 +3,7 @@
 // Yakup'un Drive'ındaki diğer dosyalara erişemez. Token hiçbir yerde kalıcı saklanmaz,
 // sadece bellekte tutulur ve süresi dolunca sessizce yenilenmeye çalışılır.
 const DriveConfig = {
-  // Yakup'un Google Cloud projesinde oluşturduğu OAuth 2.0 Client ID buraya gelecek.
-  CLIENT_ID: 'PLACEHOLDER_GOOGLE_OAUTH_CLIENT_ID',
+  CLIENT_ID: '566416223155-outplgmnrfuuee09aq7sgg7r3ro0pfsu.apps.googleusercontent.com',
   SCOPE: 'https://www.googleapis.com/auth/drive.file',
 };
 
