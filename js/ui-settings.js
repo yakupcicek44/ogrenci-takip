@@ -46,6 +46,25 @@ const SettingsView = {
       </div>
 
       <div class="card">
+        <div class="card-title">Sınıf Yönetimi</div>
+        <p class="muted small">Bir sınıfı "silmek" öğrenci kayıtlarını SİLMEZ — öğrencileri güvenle pasife alır (geri alınabilir) veya sınıf adını düzeltir.</p>
+        <div class="list" id="sinif-list">
+          ${State.getSiniflar().map((s) => {
+            const sayilar = Students.countBySinif(s);
+            return `
+              <div class="list-item" data-sinif="${Utils.escapeHtml(s)}">
+                <div class="list-item-main">
+                  <div class="list-item-title">${Utils.escapeHtml(s)}</div>
+                  <div class="list-item-sub">${sayilar.aktif} aktif${sayilar.pasif ? ' · ' + sayilar.pasif + ' pasif' : ''}</div>
+                </div>
+                <button class="btn btn-secondary btn-sm manage-sinif" data-sinif="${Utils.escapeHtml(s)}">Yönet</button>
+              </div>
+            `;
+          }).join('') || '<p class="muted small">Henüz öğrenci eklenmedi.</p>'}
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Yedekleme</div>
         <p class="muted small">
           Yedek dosyası bu cihaza indirilir. <strong>Bu yalnızca cihaz içi bir yedektir</strong> —
@@ -174,6 +193,50 @@ const SettingsView = {
         },
       });
     };
+
+    document.querySelectorAll('.manage-sinif').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sinif = btn.dataset.sinif;
+        const sayilar = Students.countBySinif(sinif);
+        Modal.open(`
+          <div class="modal-header">${Utils.escapeHtml(sinif)}</div>
+          <div class="modal-body">
+            <p class="muted small">${sayilar.aktif} aktif, ${sayilar.pasif} pasif öğrenci bu sınıfta.</p>
+            <label class="field-label">Sınıf Adını Düzelt (yazım hatası vb.)</label>
+            <input type="text" id="sinif-yeni-ad" class="input" value="${Utils.escapeHtml(sinif)}">
+            <button class="btn btn-secondary btn-block" id="sinif-rename" style="margin-top:8px;">Adı Güncelle (${sayilar.toplam} öğrenciyi etkiler)</button>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-danger" id="sinif-pasif-yap">${sayilar.aktif} Öğrenciyi Pasife Al</button>
+            <button class="btn btn-secondary" id="sinif-cancel">Kapat</button>
+          </div>
+        `, {
+          onMount: (root) => {
+            root.querySelector('#sinif-cancel').onclick = () => Modal.close();
+            root.querySelector('#sinif-rename').onclick = async () => {
+              const yeniAd = root.querySelector('#sinif-yeni-ad').value;
+              const result = await Students.renameSinif(sinif, yeniAd);
+              if (!result.ok) { Utils.toast(result.errors.join(' '), 'error'); return; }
+              Modal.close();
+              Utils.toast(`${result.etkilenen} öğrencinin sınıfı güncellendi.`, 'success');
+              Router.render();
+            };
+            root.querySelector('#sinif-pasif-yap').onclick = async () => {
+              if (!sayilar.aktif) { Utils.toast('Bu sınıfta pasife alınacak aktif öğrenci yok.', 'info'); return; }
+              const ok = await Confirm.ask(
+                `${sayilar.aktif} öğrenci pasife alınacak. Kayıtları SİLİNMEZ, istediğinde öğrenci sayfasından tekrar aktif yapabilirsin. Onaylıyor musun?`,
+                { danger: true, confirmText: 'Evet, Pasife Al' }
+              );
+              if (!ok) return;
+              const n = await Students.bulkSetPasifBySinif(sinif, true);
+              Modal.close();
+              Utils.toast(`${n} öğrenci pasife alındı.`, 'success');
+              Router.render();
+            };
+          },
+        });
+      });
+    });
 
     document.getElementById('add-term').addEventListener('click', () => openTermForm(null));
     document.querySelectorAll('.edit-term').forEach((btn) => {

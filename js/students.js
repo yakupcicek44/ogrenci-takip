@@ -63,6 +63,35 @@ const Students = {
     await State.save('students', { ...student, durum: pasif ? 'pasif' : 'aktif' });
   },
 
+  // Sınıf adını bütün öğrencilerde düzeltir (yazım hatası vb.) — bu bir "geçiş" değildir,
+  // sinifGecmisi'ne dokunmaz. Gerçek sınıf değişikliği için update() kullanılmalı.
+  async renameSinif(oldName, newName) {
+    if (!newName || !newName.trim()) return { ok: false, errors: ['Yeni sınıf adı boş olamaz.'] };
+    const trimmed = newName.trim();
+    if (trimmed === oldName) return { ok: true, etkilenen: 0 };
+    const affected = State.data.students.filter((s) => s.sinif === oldName);
+    for (const s of affected) {
+      await State.save('students', { ...s, sinif: trimmed });
+    }
+    return { ok: true, etkilenen: affected.length };
+  },
+
+  // Bir sınıftaki tüm AKTİF öğrencileri toplu pasif/aktif yapar — "sınıf silme" yerine
+  // kullanılacak güvenli alternatif; hiçbir kayıt silinmez, geri alınabilir.
+  async bulkSetPasifBySinif(sinif, pasif) {
+    const targetDurum = pasif ? 'aktif' : 'pasif'; // pasif yapacaksak şu an aktif olanları hedefle
+    const affected = State.data.students.filter((s) => s.sinif === sinif && s.durum === targetDurum);
+    for (const s of affected) {
+      await State.save('students', { ...s, durum: pasif ? 'pasif' : 'aktif' });
+    }
+    return affected.length;
+  },
+
+  countBySinif(sinif) {
+    const all = State.data.students.filter((s) => s.sinif === sinif);
+    return { toplam: all.length, aktif: all.filter((s) => s.durum !== 'pasif').length, pasif: all.filter((s) => s.durum === 'pasif').length };
+  },
+
   // Tam silme — ilişkili tüm kayıtları da siler. Geri alınamaz, UI'da onay istenmeli.
   async hardDelete(id) {
     const related = [

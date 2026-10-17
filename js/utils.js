@@ -56,6 +56,18 @@ const Utils = {
     el.className = 'toast toast-' + type + ' show';
     clearTimeout(el._hideTimer);
     el._hideTimer = setTimeout(() => el.classList.remove('show'), 2600);
+    this.haptic(type);
+  },
+
+  // Dokunsal geri bildirim — sadece destekleyen cihazlarda (çoğunlukla Android Chrome),
+  // iOS Safari'de Vibration API yok, sessizce hiçbir şey yapmaz.
+  haptic(type) {
+    try {
+      if (!navigator.vibrate) return;
+      if (type === 'error') navigator.vibrate([12, 40, 12]);
+      else if (type === 'success') navigator.vibrate(12);
+      else navigator.vibrate(8);
+    } catch (e) { /* no-op */ }
   },
 
   // Son kayıt zamanı göstergesini güncelle

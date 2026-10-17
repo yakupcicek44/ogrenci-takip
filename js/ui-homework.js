@@ -98,6 +98,23 @@ const HomeworkView = {
         <div class="modal-header">${Utils.escapeHtml(task?.ad || '')} — ${Utils.escapeHtml(student?.ad || '')}</div>
         <div class="modal-body">
           ${stats ? `<p class="muted small">Bu ödev toplam ${stats.toplam} öğrenciye atandı — ${stats['teslim edildi'] || 0} teslim etti, ${stats['eksik'] || 0} eksik, ${stats['bekliyor'] || 0} bekliyor.</p>` : ''}
+
+          <div class="card" style="box-shadow:none;">
+            <div class="card-title">Ödev Bilgileri (tüm öğrencileri etkiler)</div>
+            <label class="field-label">Ödev Adı</label>
+            <input type="text" id="ehw-task-ad" class="input" value="${Utils.escapeHtml(task?.ad || '')}">
+            <label class="field-label">Açıklama</label>
+            <textarea id="ehw-task-aciklama" class="input" rows="2">${Utils.escapeHtml(task?.aciklama || '')}</textarea>
+            <div class="field-row-2" style="margin-top:8px;">
+              <div><label class="field-label">Veriliş Tarihi</label><input type="date" id="ehw-task-verilis" class="input" value="${task?.verilisTarihi || ''}"></div>
+              <div><label class="field-label">Teslim Tarihi</label><input type="date" id="ehw-task-teslim" class="input" value="${task?.teslimTarihi || ''}"></div>
+            </div>
+            <label class="field-label">Cevap Anahtarı / Kriter</label>
+            <textarea id="ehw-task-cevapanahtari" class="input" rows="2">${Utils.escapeHtml(task?.cevapAnahtari || '')}</textarea>
+            <button class="btn btn-secondary btn-block" id="ehw-task-save" style="margin-top:8px;">Ödev Bilgilerini Güncelle</button>
+          </div>
+
+          <div class="card-title" style="margin-top:14px;">${Utils.escapeHtml(student?.ad || '')} İçin Durum</div>
           <label class="field-label">Durum</label>
           <select id="ehw-durum" class="input">
             ${Homework.DURUMLAR.map((d) => `<option value="${d}" ${d === a.durum ? 'selected' : ''}>${d}</option>`).join('')}
@@ -116,6 +133,18 @@ const HomeworkView = {
       `, {
         onMount: (root) => {
           root.querySelector('#ehw-cancel').onclick = () => Modal.close();
+          root.querySelector('#ehw-task-save').onclick = async () => {
+            const result = await Homework.updateTask(task.id, {
+              ad: root.querySelector('#ehw-task-ad').value,
+              aciklama: root.querySelector('#ehw-task-aciklama').value,
+              verilisTarihi: root.querySelector('#ehw-task-verilis').value,
+              teslimTarihi: root.querySelector('#ehw-task-teslim').value,
+              cevapAnahtari: root.querySelector('#ehw-task-cevapanahtari').value,
+            });
+            if (!result.ok) { Utils.toast(result.errors.join(' '), 'error'); return; }
+            Utils.toast('Ödev bilgileri güncellendi.', 'success');
+            renderAssignmentList();
+          };
           root.querySelector('#ehw-delete-task').onclick = async () => {
             const ok = await Confirm.ask(
               `"${task?.ad || ''}" ödevi ${stats?.toplam || 0} öğrencinin kaydından TAMAMEN silinecek. Bu işlem geri alınamaz. Onaylıyor musun?`,

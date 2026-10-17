@@ -11,6 +11,15 @@ const ReportsView = {
         <select id="report-student" class="input">
           ${students.map((s) => `<option value="${s.id}">${Utils.escapeHtml(s.ad)} (${Utils.escapeHtml(s.sinif)})</option>`).join('')}
         </select>
+        <label class="field-label">Dahil Edilecek Bölümler</label>
+        <div class="checkbox-list">
+          <label class="checkbox-row"><input type="checkbox" class="report-section-check" value="assessments" checked> Sınav ve Performans</label>
+          <label class="checkbox-row"><input type="checkbox" class="report-section-check" value="attendance" checked> Devamsızlık</label>
+          <label class="checkbox-row"><input type="checkbox" class="report-section-check" value="homework" checked> Ödevler</label>
+          <label class="checkbox-row"><input type="checkbox" class="report-section-check" value="books" checked> Kitap Okuma</label>
+          <label class="checkbox-row"><input type="checkbox" class="report-section-check" value="exams" checked> Deneme Sonuçları</label>
+          <label class="checkbox-row"><input type="checkbox" class="report-section-check" value="observations" checked> Gözlem Günlüğü</label>
+        </div>
         <div class="button-row">
           <button class="btn btn-primary" id="report-student-pdf">PDF İndir</button>
           <button class="btn btn-secondary" id="report-student-excel">Excel İndir</button>
@@ -54,15 +63,21 @@ const ReportsView = {
       Utils.toast('Rapor oluşturmak için önce öğrenci eklemelisin.', 'info');
     }
 
+    const getSelectedSections = () => {
+      const sections = {};
+      document.querySelectorAll('.report-section-check').forEach((cb) => { sections[cb.value] = cb.checked; });
+      return sections;
+    };
+
     document.getElementById('report-student-pdf')?.addEventListener('click', () => {
       const id = document.getElementById('report-student').value;
       if (!id) return;
-      Reports.studentPDF(id);
+      Reports.studentPDF(id, getSelectedSections());
     });
     document.getElementById('report-student-excel')?.addEventListener('click', () => {
       const id = document.getElementById('report-student').value;
       if (!id) return;
-      Reports.studentExcel(id);
+      Reports.studentExcel(id, getSelectedSections());
     });
     document.getElementById('karne-pdf')?.addEventListener('click', () => {
       const studentId = document.getElementById('karne-student').value;

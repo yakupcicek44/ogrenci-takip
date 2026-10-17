@@ -17,7 +17,23 @@ const DashboardView = {
       ? `Son deneme: ${allExams[allExams.length - 1].denemeAdi} (${Utils.formatDateTR(allExams[allExams.length - 1].tarih)})`
       : 'Henüz deneme sonucu girilmedi.';
 
+    let onboardingGorundu = true;
+    try { onboardingGorundu = localStorage.getItem('ogrenciTakipOnboarding') === '1'; } catch (e) { /* no-op */ }
+
     return pageWrap('Ana Sayfa', `
+      ${!onboardingGorundu ? `
+        <div class="card" id="onboarding-card" style="border-color:var(--primary);">
+          <div class="card-title">👋 Hoş Geldin</div>
+          <p class="muted small">
+            Alt menüden <strong>Öğrenciler</strong>'den öğrenci ekle, <strong>Asistan</strong>'dan günlük
+            görev/hatırlatıcılarını takip et, <strong>Yoklama</strong>'dan günlük yoklama al,
+            <strong>Raporlar</strong>'dan PDF/Excel çıktı ve dönem sonu karne al. Tüm verilerin sadece
+            bu telefonda saklanıyor — <a href="#/ayarlar">Ayarlar</a>'dan düzenli yedek almayı unutma.
+          </p>
+          <button class="btn btn-primary btn-block" id="onboarding-dismiss">Anladım</button>
+        </div>
+      ` : ''}
+
       ${yedekUyarisiGoster ? `
         <div class="alert alert-warning">
           ⚠️ ${enYeniYedek ? 'Son yedeğin üzerinden 7 günden fazla geçti.' : 'Henüz hiç yedek alınmadı.'}
@@ -65,10 +81,62 @@ const DashboardView = {
         `;
       })()}
 
+      ${(() => {
+        const siniflar = State.getSiniflar();
+        if (!siniflar.length) return '';
+        return `
+          <div class="card">
+            <div class="card-title">Sınıf Dağılımı</div>
+            <div class="list">
+              ${siniflar.map((s) => {
+                const sayilar = Students.countBySinif(s);
+                return `<a href="#/ogrenciler?sinif=${encodeURIComponent(s)}" class="list-item">
+                  <div class="list-item-main"><div class="list-item-title">${Utils.escapeHtml(s)}</div></div>
+                  <strong>${sayilar.aktif}${sayilar.pasif ? ' <span class="muted small">(+' + sayilar.pasif + ' pasif)</span>' : ''}</strong>
+                </a>`;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      })()}
+
+      ${(() => {
+        // "Eksik bilgi": hiç not, gözlem veya devamsızlık kaydı olmayan aktif öğrenciler —
+        // öğretmenin henüz dokunmadığı, dikkat gerektiren kayıtlar.
+        const eksikler = students.filter((s) => {
+          const hasAssessment = State.data.assessments.some((a) => a.studentId === s.id && !Utils.isEmptyGrade(a.puan));
+          const hasObs = State.data.observations.some((o) => o.studentId === s.id);
+          const hasAtt = State.data.attendance.some((a) => a.studentId === s.id);
+          return !hasAssessment && !hasObs && !hasAtt;
+        });
+        if (!eksikler.length) return '';
+        return `
+          <div class="alert alert-warning">
+            ⚠️ ${eksikler.length} öğrencide hiç not, gözlem veya yoklama kaydı yok: ${eksikler.slice(0, 4).map((s) => Utils.escapeHtml(s.ad)).join(', ')}${eksikler.length > 4 ? ' …' : ''}
+          </div>
+        `;
+      })()}
+
       <div class="card">
         <div class="card-title">Gelişim Özeti</div>
         <p class="muted">${Utils.escapeHtml(sonDenemeOzet)}</p>
       </div>
+
+      ${(() => {
+        const sonGozlemler = [...State.data.observations].sort((a, b) => (b.tarih || '').localeCompare(a.tarih || '')).slice(0, 5);
+        if (!sonGozlemler.length) return '';
+        return `
+          <div class="card">
+            <div class="card-title">Son Gözlem Kayıtları</div>
+            <ul class="simple-list">
+              ${sonGozlemler.map((o) => {
+                const s = State.getStudent(o.studentId);
+                return `<li>${Utils.formatDateTR(o.tarih)} · ${s ? Utils.escapeHtml(s.ad) : '?'} — ${Utils.escapeHtml(o.metin.slice(0, 60))}${o.metin.length > 60 ? '…' : ''}</li>`;
+              }).join('')}
+            </ul>
+          </div>
+        `;
+      })()}
 
       ${yaklasanlar.length ? `
         <div class="card">
@@ -87,5 +155,10 @@ const DashboardView = {
     `);
   },
 
-  mount() {},
+  mount() {
+    document.getElementById('onboarding-dismiss')?.addEventListener('click', () => {
+      try { localStorage.setItem('ogrenciTakipOnboarding', '1'); } catch (e) { /* no-op */ }
+      Router.render();
+    });
+  },
 };

@@ -35,6 +35,24 @@ const Homework = {
     return { ok: true, task };
   },
 
+  // Ödev TANIMINI (başlık/tarihler/cevap anahtarı) düzenler — tüm öğrencilerin
+  // atamasını etkiler, çünkü hepsi aynı tanıma bağlıdır.
+  async updateTask(taskId, form) {
+    const task = State.getHomeworkTask(taskId);
+    if (!task) return { ok: false, errors: ['Ödev bulunamadı.'] };
+    if (!form.ad || !form.ad.trim()) return { ok: false, errors: ['Ödev adı boş olamaz.'] };
+    const updated = {
+      ...task,
+      ad: form.ad.trim(),
+      aciklama: form.aciklama !== undefined ? form.aciklama : task.aciklama,
+      cevapAnahtari: form.cevapAnahtari !== undefined ? form.cevapAnahtari : task.cevapAnahtari,
+      verilisTarihi: form.verilisTarihi || task.verilisTarihi,
+      teslimTarihi: form.teslimTarihi !== undefined ? (form.teslimTarihi || null) : task.teslimTarihi,
+    };
+    await State.save('homeworkTasks', updated);
+    return { ok: true, task: updated };
+  },
+
   async updateAssignment(id, form) {
     const assignment = State.data.homeworkAssignments.find((a) => a.id === id);
     if (!assignment) return { ok: false, errors: ['Kayıt bulunamadı.'] };

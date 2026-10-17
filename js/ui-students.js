@@ -151,9 +151,12 @@ const StudentListView = {
       }
     });
 
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const sinifParam = params.get('sinif');
+    if (sinifParam) document.getElementById('student-sinif-filter').value = sinifParam;
+
     renderList();
 
-    const params = new URLSearchParams(location.hash.split('?')[1] || '');
     if (params.get('ekle') === '1') {
       openStudentForm(null, (student) => { location.hash = '#/ogrenci/' + student.id; });
     }
