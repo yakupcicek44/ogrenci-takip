@@ -50,6 +50,23 @@ const SettingsView = {
       </div>
 
       <div class="card">
+        <div class="card-title">Google Drive'a Otomatik Yedekleme</div>
+        <p class="muted small">
+          Bağlandığında uygulama her açılışta (günde en fazla bir kez) kendi Drive'ına otomatik bir yedek
+          dosyası yükler — sadece bu uygulamanın oluşturduğu dosyalara erişilir, Drive'ındaki diğer
+          dosyalarına dokunulmaz.
+        </p>
+        <p class="muted small">Durum: ${State.data.settings.drive?.connected ? 'Bağlı' : 'Bağlı değil'}${State.data.settings.drive?.sonBasariliYedek ? ' · Son Drive yedeği: ' + Utils.formatDateTimeTR(State.data.settings.drive.sonBasariliYedek) : ''}</p>
+        ${State.data.settings.drive?.connected ? `
+          <button class="btn btn-secondary btn-block" id="drive-backup-now">Şimdi Drive'a Yedekle</button>
+          <button class="btn btn-secondary btn-block" id="drive-disconnect" style="margin-top:8px;">Bağlantıyı Kaldır</button>
+        ` : `
+          <button class="btn btn-primary btn-block" id="drive-connect">Google Drive'a Bağlan</button>
+        `}
+        <div id="drive-status" class="muted small" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Hesap</div>
         <p class="muted small">Kullanıcı adı: ${Utils.escapeHtml(State.data.settings.auth?.username || '-')}</p>
         <button class="btn btn-secondary btn-block" id="change-password">Şifre Değiştir</button>
@@ -166,6 +183,42 @@ const SettingsView = {
       }
     });
 
+    document.getElementById('drive-connect')?.addEventListener('click', async () => {
+      const statusEl = document.getElementById('drive-status');
+      statusEl.textContent = 'Google Drive bağlantısı için izin ekranı açılıyor…';
+      try {
+        await DriveBackup.connectInteractive();
+        statusEl.textContent = '';
+        Utils.toast('Google Drive bağlandı.', 'success');
+        Router.render();
+      } catch (e) {
+        statusEl.textContent = '';
+        Utils.toast('Bağlanılamadı: ' + e.message, 'error');
+      }
+    });
+
+    document.getElementById('drive-backup-now')?.addEventListener('click', async () => {
+      const statusEl = document.getElementById('drive-status');
+      statusEl.textContent = 'Drive\'a yükleniyor…';
+      try {
+        await DriveBackup.backupNow({ interactive: true });
+        statusEl.textContent = '';
+        Utils.toast('Drive\'a yedeklendi.', 'success');
+        Router.render();
+      } catch (e) {
+        statusEl.textContent = '';
+        Utils.toast('Yedekleme başarısız: ' + e.message, 'error');
+      }
+    });
+
+    document.getElementById('drive-disconnect')?.addEventListener('click', async () => {
+      const ok = await Confirm.ask('Google Drive bağlantısı kaldırılsın mı? Otomatik yedekleme duracak.', {});
+      if (!ok) return;
+      await DriveBackup.disconnect();
+      Utils.toast('Bağlantı kaldırıldı.', 'success');
+      Router.render();
+    });
+
     document.getElementById('logout').addEventListener('click', () => {
       Auth.lock();
       location.reload();
@@ -213,7 +266,7 @@ const SettingsView = {
       if (!ok1) return;
       const ok2 = await Confirm.ask('Bu işlem GERİ ALINAMAZ. Gerçekten tüm verileri silmek istiyor musun?', { danger: true, confirmText: 'Evet, Sil' });
       if (!ok2) return;
-      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans']) {
+      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks']) {
         await DB.clear(store);
       }
       await State.init();

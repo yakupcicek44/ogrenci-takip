@@ -1,6 +1,6 @@
 // IndexedDB katmanı — tüm kalıcı veri burada tutulur (geçici bellek kullanılmaz)
 const DB_NAME = 'ogrenci-takip-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbInstance = null;
 
@@ -56,6 +56,41 @@ function openDB() {
         const sc = db.createObjectStore('scans', { keyPath: 'id' });
         sc.createIndex('studentId', 'studentId', { unique: false });
         sc.createIndex('ownerId', 'ownerId', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('observations')) {
+        const o = db.createObjectStore('observations', { keyPath: 'id' });
+        o.createIndex('studentId', 'studentId', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('tasks')) {
+        const t = db.createObjectStore('tasks', { keyPath: 'id' });
+        t.createIndex('studentId', 'studentId', { unique: false });
+        t.createIndex('durum', 'durum', { unique: false });
+      }
+
+      // v2 -> v3: eski tek metinlik "gozlemNotlari" alanını kaybetmemek için
+      // mevcut öğrencilerin notunu ilk gözlem günlüğü kaydına taşıyoruz.
+      if (e.oldVersion < 3) {
+        const tr = e.target.transaction;
+        const studentsStore = tr.objectStore('students');
+        const obsStore = tr.objectStore('observations');
+        studentsStore.openCursor().onsuccess = (ev) => {
+          const cursor = ev.target.result;
+          if (!cursor) return;
+          const student = cursor.value;
+          if (student.gozlemNotlari && student.gozlemNotlari.trim()) {
+            obsStore.put({
+              id: 'migrated_' + student.id,
+              studentId: student.id,
+              tarih: (student.olusturmaTarihi || new Date().toISOString()).slice(0, 10),
+              tur: 'gozlem',
+              metin: student.gozlemNotlari,
+              beceriEtiketi: '',
+            });
+          }
+          cursor.continue();
+        };
       }
     };
 
@@ -138,7 +173,7 @@ const DB = {
 
   // Tüm store'ları tek bir nesnede döndürür (JSON yedekleme için)
   async exportAll() {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'settings'];
     const result = {};
     for (const n of names) {
       result[n] = await DB.getAll(n);
@@ -148,7 +183,7 @@ const DB = {
 
   // JSON yedekten tüm store'ları geri yükler (önce temizler, sonra yazar)
   async importAll(data) {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'settings'];
     for (const n of names) {
       await DB.clear(n);
       if (Array.isArray(data[n]) && data[n].length) {

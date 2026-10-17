@@ -7,7 +7,9 @@ const DashboardView = {
     const yaklasanlar = Homework.getUpcoming(7);
 
     const sonYedek = State.data.settings.sonYedekTarihi;
-    const yedekUyarisiGoster = !sonYedek || (Date.now() - new Date(sonYedek).getTime()) > 7 * 24 * 3600 * 1000;
+    const sonDriveYedek = State.data.settings.drive?.sonBasariliYedek;
+    const enYeniYedek = [sonYedek, sonDriveYedek].filter(Boolean).sort().pop();
+    const yedekUyarisiGoster = !enYeniYedek || (Date.now() - new Date(enYeniYedek).getTime()) > 7 * 24 * 3600 * 1000;
 
     // Basit gelişim özeti: son 5 deneme sonucuna göre genel sınıf ortalaması trendi
     const allExams = State.data.mockExams.slice().sort((a, b) => (a.tarih || '').localeCompare(b.tarih || ''));
@@ -18,9 +20,9 @@ const DashboardView = {
     return pageWrap('Ana Sayfa', `
       ${yedekUyarisiGoster ? `
         <div class="alert alert-warning">
-          ⚠️ ${sonYedek ? 'Son yedeğin üzerinden 7 günden fazla geçti.' : 'Henüz hiç yedek alınmadı.'}
+          ⚠️ ${enYeniYedek ? 'Son yedeğin üzerinden 7 günden fazla geçti.' : 'Henüz hiç yedek alınmadı.'}
           Cihaz içi kayıt tek başına telefon kaybına karşı yeterli değildir —
-          <a href="#/ayarlar">şimdi yedek al</a> ve bulutta da sakla.
+          <a href="#/ayarlar">şimdi yedek al</a> (Google Drive'a otomatik yedeklemeyi de Ayarlar'dan açabilirsin).
         </div>
       ` : ''}
 
@@ -42,6 +44,22 @@ const DashboardView = {
           <div class="stat-label">Yaklaşan Teslim (7g)</div>
         </div>
       </div>
+
+      ${(() => {
+        const bugunGorevleri = Tasks.getDashboardTasks();
+        if (!bugunGorevleri.length) return '';
+        return `
+          <div class="card">
+            <div class="card-title">Bugünkü Görevler</div>
+            <ul class="simple-list">
+              ${bugunGorevleri.slice(0, 5).map((t) => `
+                <li>${t.oncelik === 'yuksek' ? '🔴 ' : ''}${Utils.escapeHtml(t.baslik)}${Tasks.isOverdue(t) ? ' <strong style="color:var(--danger)">(gecikti)</strong>' : ''}</li>
+              `).join('')}
+            </ul>
+            <a href="#/asistan" class="btn btn-secondary btn-block" style="margin-top:8px;">Asistanı Aç</a>
+          </div>
+        `;
+      })()}
 
       <div class="card">
         <div class="card-title">Gelişim Özeti</div>

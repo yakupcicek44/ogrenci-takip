@@ -6,6 +6,7 @@ const Router = {
     { pattern: /^#\/ogrenci\/([^/]+)$/, view: StudentDetailView, params: ['id'] },
     { pattern: /^#\/ogrenci\/([^/]+)\/([^/]+)$/, view: StudentDetailView, params: ['id', 'tab'] },
     { pattern: /^#\/odev-atama$/, view: HomeworkView },
+    { pattern: /^#\/asistan$/, view: AssistantView },
     { pattern: /^#\/raporlar$/, view: ReportsView },
     { pattern: /^#\/ayarlar$/, view: SettingsView },
   ],
@@ -48,12 +49,23 @@ window.addEventListener('hashchange', () => {
   if (Auth.isUnlocked()) Router.render();
 });
 
+function maybeAutoDriveBackup() {
+  if (!DriveBackup.isConnected()) return;
+  const son = State.data.settings.drive?.sonBasariliYedek;
+  const yirmiSaatGecti = !son || (Date.now() - new Date(son).getTime()) > 20 * 3600 * 1000;
+  if (!yirmiSaatGecti) return;
+  // Sessiz, en iyi gayret denemesi — başarısız olursa kullanıcıyı rahatsız etmez,
+  // Ayarlar'daki "Şimdi Yedekle" butonu her zaman manuel çalışır.
+  DriveBackup.backupNow({ interactive: false }).catch(() => {});
+}
+
 async function boot() {
   document.getElementById('bottom-nav').style.display = '';
   if (!location.hash) location.hash = '#/';
   await Router.render();
   registerServiceWorker();
   Utils.markSaved();
+  maybeAutoDriveBackup();
 }
 
 function showLogin() {

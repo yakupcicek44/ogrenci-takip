@@ -121,11 +121,23 @@ const Reports = {
       y = doc.lastAutoTable.finalY + 20;
     }
 
-    if (student.gozlemNotlari) {
-      if (y > 700) { doc.addPage(); y = 40; }
-      y = this._sectionTitle(doc, 'Öğretmen Gözlem Notları', y);
-      doc.setFontSize(9);
-      doc.text(student.gozlemNotlari, 40, y, { maxWidth: 515 });
+    const observations = State.getStudentObservations(studentId);
+    if (observations.length) {
+      if (y > 680) { doc.addPage(); y = 40; }
+      y = this._sectionTitle(doc, 'Gözlem Günlüğü', y);
+      doc.autoTable({
+        startY: y,
+        head: [['Tarih', 'Tür', 'Beceri Etiketi', 'Metin']],
+        body: observations.map((o) => [
+          Utils.formatDateTR(o.tarih),
+          Observations.TYPES.find((t) => t.key === o.tur)?.etiket || o.tur,
+          o.beceriEtiketi || '-',
+          o.metin,
+        ]),
+        styles: { font: 'Lato', fontSize: 9 },
+        headStyles: { font: 'Lato', fontStyle: 'bold', fillColor: [37, 99, 235] },
+        margin: { left: 40, right: 40 },
+      });
     }
 
     doc.save(`${student.ad.replace(/\s+/g, '_')}_rapor.pdf`);
@@ -170,9 +182,14 @@ const Reports = {
       ['Okul No', student.okulNo],
       ['Sınıf/Şube', student.sinif],
       ['Açıklama', student.aciklama || ''],
-      ['Gözlem Notları', student.gozlemNotlari || ''],
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(genel), 'Genel Bilgiler');
+
+    const obsRows = [['Tarih', 'Tür', 'Beceri Etiketi', 'Metin']];
+    for (const o of State.getStudentObservations(studentId)) {
+      obsRows.push([o.tarih, Observations.TYPES.find((t) => t.key === o.tur)?.etiket || o.tur, o.beceriEtiketi || '', o.metin]);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(obsRows), 'Gözlem Günlüğü');
 
     const terms = State.getTermsSorted();
     const notRows = [['Dönem', 'Değerlendirme', 'Not', 'Tarih', 'Açıklama']];

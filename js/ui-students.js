@@ -14,9 +14,7 @@ function studentFormHtml(student) {
 
       <label class="field-label">Açıklama</label>
       <textarea id="f-aciklama" class="input" rows="2">${Utils.escapeHtml(student?.aciklama || '')}</textarea>
-
-      <label class="field-label">Öğretmen Gözlem Notları</label>
-      <textarea id="f-gozlem" class="input" rows="3">${Utils.escapeHtml(student?.gozlemNotlari || '')}</textarea>
+      <p class="muted small">Gözlem/ön değerlendirme notları öğrenci sayfasının Genel Bilgiler sekmesinden, tarihli olarak eklenir.</p>
 
       <div id="form-errors" class="form-errors"></div>
     </div>
@@ -38,7 +36,6 @@ function openStudentForm(studentId, onSaved) {
           okulNo: root.querySelector('#f-okulNo').value,
           sinif: root.querySelector('#f-sinif').value,
           aciklama: root.querySelector('#f-aciklama').value,
-          gozlemNotlari: root.querySelector('#f-gozlem').value,
         };
         const result = student ? await Students.update(student.id, form) : await Students.create(form);
         if (!result.ok) {
@@ -226,8 +223,10 @@ const renderGenelTab = {
       </div>
 
       <div class="card">
-        <div class="card-title">Öğretmen Gözlem Notları</div>
-        <p class="muted">${Utils.escapeHtml(student.gozlemNotlari) || '<em>Girilmemiş</em>'}</p>
+        <div class="card-title">Gözlem Günlüğü</div>
+        <p class="muted small">Maarif Modeli'nin süreç temelli değerlendirme anlayışına uygun olarak her gözlem/ön değerlendirme kendi tarihiyle kaydedilir.</p>
+        <button class="btn btn-secondary btn-block" id="add-observation">+ Gözlem / Ön Değerlendirme Ekle</button>
+        <div id="observation-list" class="list" style="margin-top:10px;"></div>
       </div>
 
       <div class="card card-danger">
@@ -256,6 +255,88 @@ const renderGenelTab = {
       Utils.toast('Öğrenci silindi.', 'success');
       location.hash = '#/ogrenciler';
     };
+
+    const openObservationForm = (obs) => {
+      Modal.open(`
+        <div class="modal-header">${obs ? 'Gözlemi Düzenle' : 'Yeni Gözlem'}</div>
+        <div class="modal-body">
+          <label class="field-label">Tür</label>
+          <select id="obs-tur" class="input">
+            ${Observations.TYPES.map((t) => `<option value="${t.key}" ${obs?.tur === t.key ? 'selected' : ''}>${t.etiket}</option>`).join('')}
+          </select>
+          <label class="field-label">Tarih</label>
+          <input type="date" id="obs-tarih" class="input" value="${obs?.tarih || Utils.todayISO()}">
+          <label class="field-label">Metin *</label>
+          <textarea id="obs-metin" class="input" rows="3">${Utils.escapeHtml(obs?.metin || '')}</textarea>
+          <label class="field-label">Beceri/Yetkinlik Etiketi (opsiyonel)</label>
+          <input type="text" id="obs-beceri" class="input" value="${Utils.escapeHtml(obs?.beceriEtiketi || '')}" placeholder="Örn: Eleştirel Düşünme">
+          <div class="checkbox-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;">
+            ${Observations.BECERI_ONERILERI.map((b) => `<span class="badge obs-chip" data-val="${Utils.escapeHtml(b)}" style="cursor:pointer;">${b}</span>`).join('')}
+          </div>
+          <div id="obs-errors" class="form-errors"></div>
+        </div>
+        <div class="modal-actions">
+          ${obs ? '<button class="btn btn-danger" id="obs-delete">Sil</button>' : ''}
+          <button class="btn btn-secondary" id="obs-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="obs-save">Kaydet</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#obs-cancel').onclick = () => Modal.close();
+          root.querySelectorAll('.obs-chip').forEach((chip) => {
+            chip.onclick = () => { root.querySelector('#obs-beceri').value = chip.dataset.val; };
+          });
+          if (obs) {
+            root.querySelector('#obs-delete').onclick = async () => {
+              const ok = await Confirm.ask('Bu gözlem kaydı silinsin mi?', { danger: true });
+              if (!ok) return;
+              await Observations.remove(obs.id);
+              Modal.close();
+              renderObservations();
+            };
+          }
+          root.querySelector('#obs-save').onclick = async () => {
+            const result = await Observations.save(student.id, {
+              tur: root.querySelector('#obs-tur').value,
+              tarih: root.querySelector('#obs-tarih').value,
+              metin: root.querySelector('#obs-metin').value,
+              beceriEtiketi: root.querySelector('#obs-beceri').value,
+            }, obs?.id);
+            if (!result.ok) {
+              root.querySelector('#obs-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
+              return;
+            }
+            Modal.close();
+            Utils.toast('Gözlem kaydedildi.', 'success');
+            renderObservations();
+          };
+        },
+      });
+    };
+
+    const renderObservations = () => {
+      const list = State.getStudentObservations(student.id);
+      const container = document.getElementById('observation-list');
+      if (!list.length) { container.innerHTML = emptyState('Henüz gözlem eklenmedi.', '📝'); return; }
+      container.innerHTML = list.map((o) => {
+        const tur = Observations.TYPES.find((t) => t.key === o.tur);
+        return `
+          <div class="list-item" data-id="${o.id}">
+            <div class="list-item-main">
+              <div class="list-item-title">${Utils.formatDateTR(o.tarih)} · <span class="badge">${tur ? tur.etiket : o.tur}</span>${o.beceriEtiketi ? ' · <span class="badge">' + Utils.escapeHtml(o.beceriEtiketi) + '</span>' : ''}</div>
+              <div class="list-item-sub">${Utils.escapeHtml(o.metin)}</div>
+            </div>
+            <button class="btn btn-secondary btn-sm edit-obs" data-id="${o.id}">Düzenle</button>
+          </div>
+        `;
+      }).join('');
+      container.querySelectorAll('.edit-obs').forEach((btn) => {
+        btn.onclick = () => openObservationForm(list.find((o) => o.id === btn.dataset.id));
+      });
+    };
+
+    document.getElementById('add-observation').onclick = () => openObservationForm(null);
+    renderObservations();
   },
 };
 

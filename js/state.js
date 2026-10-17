@@ -10,6 +10,8 @@ const State = {
     books: [],
     mockExams: [],
     scans: [],
+    observations: [],
+    tasks: [],
     settings: null,
   },
 
@@ -25,6 +27,8 @@ const State = {
     d.books = await DB.getAll('books');
     d.mockExams = await DB.getAll('mockExams');
     d.scans = await DB.getAll('scans');
+    d.observations = await DB.getAll('observations');
+    d.tasks = await DB.getAll('tasks');
     const settingsRows = await DB.getAll('settings');
     d.settings = settingsRows.find((s) => s.id === 'main') || null;
 
@@ -106,6 +110,22 @@ const State = {
 
   getOwnerScans(ownerId) {
     return this.data.scans.filter((s) => s.ownerId === ownerId);
+  },
+
+  getStudentObservations(studentId) {
+    return this.data.observations.filter((o) => o.studentId === studentId).sort((a, b) => (b.tarih || '').localeCompare(a.tarih || ''));
+  },
+
+  getTask(id) {
+    return this.data.tasks.find((t) => t.id === id) || null;
+  },
+
+  getSubtasks(taskId) {
+    return this.data.tasks.filter((t) => t.ustGorevId === taskId);
+  },
+
+  getTopLevelTasks() {
+    return this.data.tasks.filter((t) => !t.ustGorevId);
   },
 
   getHomeworkTask(id) {

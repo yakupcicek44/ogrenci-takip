@@ -73,6 +73,8 @@ const Students = {
       ['books', State.data.books.filter((b) => b.studentId === id)],
       ['mockExams', State.data.mockExams.filter((m) => m.studentId === id)],
       ['scans', State.data.scans.filter((s) => s.studentId === id)],
+      ['observations', State.data.observations.filter((o) => o.studentId === id)],
+      ['tasks', State.data.tasks.filter((t) => t.studentId === id)],
     ];
     for (const [store, rows] of related) {
       for (const row of rows) {
