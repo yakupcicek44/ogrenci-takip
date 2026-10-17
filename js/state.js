@@ -20,6 +20,7 @@ const State = {
     dersProgrami: [],
     dersProgramiIstisna: [],
     ekDersSaatleri: [],
+    chatMesajlari: [],
     settings: null,
   },
 
@@ -45,6 +46,7 @@ const State = {
     d.dersProgrami = await DB.getAll('dersProgrami');
     d.dersProgramiIstisna = await DB.getAll('dersProgramiIstisna');
     d.ekDersSaatleri = await DB.getAll('ekDersSaatleri');
+    d.chatMesajlari = await DB.getAll('chatMesajlari');
     const settingsRows = await DB.getAll('settings');
     d.settings = settingsRows.find((s) => s.id === 'main') || null;
 

@@ -81,4 +81,34 @@ const AiChat = {
   async undo(store, id) {
     await State.remove(store, id);
   },
+
+  // --- Sohbet geçmişi (kalıcı) — sadece METİN kaydedilir, fotoğraflar asla saklanmaz. ---
+  async saveMessage(record) {
+    const full = { id: Utils.uid(), olusturmaTarihi: new Date().toISOString(), ...record };
+    await State.save('chatMesajlari', full);
+    return full;
+  },
+
+  async updateMessage(id, patch) {
+    const existing = State.data.chatMesajlari.find((m) => m.id === id);
+    if (!existing) return;
+    await State.save('chatMesajlari', { ...existing, ...patch });
+  },
+
+  getMessages() {
+    return [...State.data.chatMesajlari].sort((a, b) => (a.olusturmaTarihi || '').localeCompare(b.olusturmaTarihi || ''));
+  },
+
+  async clearMessages() {
+    for (const m of [...State.data.chatMesajlari]) await State.remove('chatMesajlari', m.id);
+  },
+
+  // Kayıtlı mesaj geçmişinden Gemini'ye gönderilecek son N turu (role:user/model) çıkarır.
+  // Hata balonları context'e dahil edilmez (model için gürültü olur).
+  buildHistoryFromMessages(messages) {
+    return messages
+      .filter((m) => m.role !== 'error')
+      .slice(-10)
+      .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', text: m.text }));
+  },
 };

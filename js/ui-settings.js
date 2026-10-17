@@ -22,6 +22,7 @@ const SettingsView = {
         <div class="kv-row"><span>Belgeler</span><strong>${State.data.documents.length}</strong></div>
         <div class="kv-row"><span>Çöp Kutusu</span><strong>${State.data.trash.length}</strong></div>
         <div class="kv-row"><span>Ders Programı</span><strong>${State.data.dersProgrami.length} ders · bu ay ${Schedule.totalHoursInRange(Schedule.monthRange(Utils.todayISO().slice(0, 7)).start, Schedule.monthRange(Utils.todayISO().slice(0, 7)).end)} saat</strong></div>
+        <div class="kv-row"><span>Sohbet Geçmişi</span><strong>${State.data.chatMesajlari.length} mesaj</strong></div>
         <div class="kv-row"><span>Son JSON Yedek</span><strong>${sonYedek ? Utils.formatDateTimeTR(sonYedek) : 'Hiç alınmadı'}</strong></div>
         <div class="kv-row"><span>Son Drive Yedeği</span><strong>${State.data.settings.drive?.sonBasariliYedek ? Utils.formatDateTimeTR(State.data.settings.drive.sonBasariliYedek) : 'Bağlı değil / hiç alınmadı'}</strong></div>
         <div class="kv-row"><span>Tahmini Depolama</span><strong id="storage-estimate">hesaplanıyor…</strong></div>
@@ -459,7 +460,7 @@ const SettingsView = {
       if (!ok1) return;
       const ok2 = await Confirm.ask('Bu işlem GERİ ALINAMAZ. Gerçekten tüm verileri silmek istiyor musun?', { danger: true, confirmText: 'Evet, Sil' });
       if (!ok2) return;
-      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri']) {
+      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'chatMesajlari']) {
         await DB.clear(store);
       }
       await State.init();

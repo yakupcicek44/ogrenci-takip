@@ -1,6 +1,6 @@
 // Her gerçek deploy'da elle artırılır — Ayarlar'daki Sistem Durumu'nda görünür,
 // yeni sürümün telefona gerçekten indiğini doğrulamanın en kolay yolu budur.
-const APP_VERSION = '2026.10.18-01';
+const APP_VERSION = '2026.10.18-02';
 
 // Ortak yardımcı fonksiyonlar
 const Utils = {

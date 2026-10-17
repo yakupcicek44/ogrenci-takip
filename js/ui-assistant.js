@@ -776,9 +776,12 @@ const renderSohbetTab = {
       <div class="card" style="margin-bottom:10px;">
         <p class="muted small">
           Bu sohbet Google Gemini'ye bağlanır — yazdığın mesaj ve (varsa) fotoğraf analiz için
-          gönderilir. Eklediğin hatırlatıcı/görev/not/ders kaydı <strong>anında kaydedilir,
-          onay istenmez</strong> — yanlışsa mesajın altındaki "Geri Al"ı kullan.
+          gönderilir (fotoğraf hiçbir yere kaydedilmez). Eklediğin hatırlatıcı/görev/not/ders
+          kaydı <strong>anında kaydedilir, onay istenmez</strong> — yanlışsa mesajın altındaki
+          "Geri Al"ı kullan. Sohbet metni (sadece metin) bu cihazda saklanır, sayfadan çıkıp
+          geri geldiğinde geçmişini görürsün.
         </p>
+        <button class="btn btn-secondary btn-sm" id="chat-clear-btn" style="margin-top:6px;">Sohbeti Temizle</button>
       </div>
       <div id="chat-messages" class="chat-messages"></div>
       <div id="chat-photo-preview" class="chat-photo-preview" style="display:none;"></div>
@@ -792,49 +795,60 @@ const renderSohbetTab = {
   },
 
   mount() {
-    let history = []; // {role:'user'|'model', text}
+    let history = []; // {role:'user'|'model', text} — Gemini'ye gönderilen son N tur
     let pendingImage = null; // {dataUrl, mimeType} — gönderilince silinir, hiçbir yere kaydedilmez
     const messagesEl = document.getElementById('chat-messages');
 
-    const addBubble = (html) => {
+    const addBubbleEl = (html) => {
       const wrap = document.createElement('div');
       wrap.innerHTML = html;
-      messagesEl.appendChild(wrap.firstElementChild);
+      const el = wrap.firstElementChild;
+      messagesEl.appendChild(el);
       messagesEl.scrollTop = messagesEl.scrollHeight;
+      return el;
     };
 
-    const renderUserBubble = (text, imageDataUrl) => {
-      addBubble(`
-        <div class="chat-bubble chat-bubble-user">
-          ${imageDataUrl ? `<img src="${imageDataUrl}" style="max-width:120px;border-radius:8px;display:block;margin-bottom:6px;">` : ''}
-          ${Utils.escapeHtml(text)}
-        </div>
-      `);
+    // Kalıcı bir sohbet kaydını (ilk render'da geçmişten veya az önce oluşturulmuş olarak)
+    // balona çevirir — "Geri Al" durumu (undone) dahil, sayfa yeniden açıldığında da doğru görünür.
+    const renderBubbleFromRecord = (m) => {
+      if (m.role === 'user') {
+        addBubbleEl(`
+          <div class="chat-bubble chat-bubble-user">
+            ${m.hasImage ? `<div class="muted small" style="margin-bottom:4px;opacity:0.85;">📷 Fotoğraf gönderildi (kaydedilmedi)</div>` : ''}
+            ${Utils.escapeHtml(m.text)}
+          </div>
+        `);
+      } else if (m.role === 'assistant') {
+        addBubbleEl(`<div class="chat-bubble chat-bubble-assistant">${Utils.escapeHtml(m.text)}</div>`);
+      } else if (m.role === 'error') {
+        addBubbleEl(`<div class="chat-bubble chat-bubble-error">⚠️ ${Utils.escapeHtml(m.text)}</div>`);
+      } else if (m.role === 'action') {
+        const el = addBubbleEl(`
+          <div class="chat-bubble chat-bubble-action" style="${m.undone ? 'opacity:0.55;' : ''}">
+            ✅ ${Utils.escapeHtml(m.text)}
+            <button class="btn btn-secondary btn-sm chat-undo-btn" ${m.undone ? 'disabled' : ''} style="margin-top:6px;">${m.undone ? 'Geri alındı' : 'Geri Al'}</button>
+          </div>
+        `);
+        const btn = el.querySelector('.chat-undo-btn');
+        btn.onclick = async () => {
+          await AiChat.undo(m.store, m.recordId);
+          await AiChat.updateMessage(m.id, { undone: true });
+          btn.disabled = true;
+          btn.textContent = 'Geri alındı';
+          el.style.opacity = '0.55';
+        };
+      }
     };
 
-    const renderAssistantText = (text) => {
-      addBubble(`<div class="chat-bubble chat-bubble-assistant">${Utils.escapeHtml(text)}</div>`);
-    };
-
-    const renderError = (text) => {
-      addBubble(`<div class="chat-bubble chat-bubble-error">⚠️ ${Utils.escapeHtml(text)}</div>`);
-    };
-
-    const renderActionBubble = (ozet, store, id) => {
-      addBubble(`
-        <div class="chat-bubble chat-bubble-action">
-          ✅ ${Utils.escapeHtml(ozet)}
-          <button class="btn btn-secondary btn-sm chat-undo-btn" style="margin-top:6px;">Geri Al</button>
-        </div>
-      `);
-      const btn = messagesEl.lastElementChild.querySelector('.chat-undo-btn');
-      btn.onclick = async () => {
-        await AiChat.undo(store, id);
-        btn.disabled = true;
-        btn.textContent = 'Geri alındı';
-        btn.closest('.chat-bubble').style.opacity = '0.55';
-      };
-    };
+    // Geçmişi yükle — hiç yoksa (ilk ziyaret) karşılama mesajını kalıcı olarak kaydet.
+    const persisted = AiChat.getMessages();
+    if (!persisted.length) {
+      AiChat.saveMessage({ role: 'assistant', text: 'Merhaba! Ders programını, görevlerini veya hatırlatıcılarını sorabilir, ya da yeni bir şey eklememi isteyebilirsin.' })
+        .then((m) => renderBubbleFromRecord(m));
+    } else {
+      persisted.forEach(renderBubbleFromRecord);
+      history = AiChat.buildHistoryFromMessages(persisted);
+    }
 
     const sendMessage = async () => {
       const input = document.getElementById('chat-input');
@@ -846,7 +860,8 @@ const renderSohbetTab = {
       document.getElementById('chat-photo-preview').style.display = 'none';
       document.getElementById('chat-photo-preview').innerHTML = '';
 
-      renderUserBubble(text || '(fotoğraf)', imageForThisMessage?.dataUrl);
+      const userMsg = await AiChat.saveMessage({ role: 'user', text: text || '(fotoğraf)', hasImage: !!imageForThisMessage });
+      renderBubbleFromRecord(userMsg);
       const sendBtn = document.getElementById('chat-send-btn');
       sendBtn.disabled = true;
 
@@ -856,18 +871,22 @@ const renderSohbetTab = {
         if (data.action) {
           const result = await AiChat.executeAction(data.action);
           if (result.ok) {
-            renderActionBubble(result.ozet, result.store, result.id);
+            const actionMsg = await AiChat.saveMessage({ role: 'action', text: result.ozet, store: result.store, recordId: result.id, undone: false });
+            renderBubbleFromRecord(actionMsg);
             history.push({ role: 'model', text: result.ozet });
           } else {
-            renderError('Eylem uygulanamadı: ' + result.error);
+            const errMsg = await AiChat.saveMessage({ role: 'error', text: 'Eylem uygulanamadı: ' + result.error });
+            renderBubbleFromRecord(errMsg);
           }
         } else {
-          renderAssistantText(data.replyText || '(yanıt alınamadı)');
+          const replyMsg = await AiChat.saveMessage({ role: 'assistant', text: data.replyText || '(yanıt alınamadı)' });
+          renderBubbleFromRecord(replyMsg);
           history.push({ role: 'model', text: data.replyText || '' });
         }
         history = history.slice(-10);
       } catch (e) {
-        renderError(e.message);
+        const errMsg = await AiChat.saveMessage({ role: 'error', text: e.message });
+        renderBubbleFromRecord(errMsg);
       } finally {
         sendBtn.disabled = false;
       }
@@ -876,6 +895,19 @@ const renderSohbetTab = {
     document.getElementById('chat-send-btn').addEventListener('click', sendMessage);
     document.getElementById('chat-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') sendMessage();
+    });
+
+    document.getElementById('chat-clear-btn').addEventListener('click', async () => {
+      if (!AiChat.getMessages().length) { Utils.toast('Sohbet geçmişi zaten boş.', 'info'); return; }
+      const ok = await Confirm.ask(
+        'Sohbet geçmişi silinsin mi? Eklediğin hatırlatıcı/görev/not/ders kayıtları SİLİNMEZ, sadece bu ekrandaki metin geçmişi temizlenir.',
+        { danger: true }
+      );
+      if (!ok) return;
+      await AiChat.clearMessages();
+      messagesEl.innerHTML = '';
+      history = [];
+      Utils.toast('Sohbet geçmişi temizlendi.', 'success');
     });
 
     document.getElementById('chat-photo-btn').addEventListener('click', () => {
@@ -929,7 +961,5 @@ const renderSohbetTab = {
         rec.start();
       });
     }
-
-    renderAssistantText('Merhaba! Ders programını, görevlerini veya hatırlatıcılarını sorabilir, ya da yeni bir şey eklememi isteyebilirsin.');
   },
 };

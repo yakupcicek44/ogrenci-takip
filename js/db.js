@@ -1,6 +1,6 @@
 // IndexedDB katmanı — tüm kalıcı veri burada tutulur (geçici bellek kullanılmaz)
 const DB_NAME = 'ogrenci-takip-db';
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 
 let dbInstance = null;
 
@@ -116,6 +116,11 @@ function openDB() {
         eds.createIndex('tarih', 'tarih', { unique: false });
       }
 
+      // Asistan Sohbeti geçmişi — sadece metin (fotoğraflar hiçbir zaman kaydedilmez).
+      if (!db.objectStoreNames.contains('chatMesajlari')) {
+        db.createObjectStore('chatMesajlari', { keyPath: 'id' });
+      }
+
       // v2 -> v3: eski tek metinlik "gozlemNotlari" alanını kaybetmemek için
       // mevcut öğrencilerin notunu ilk gözlem günlüğü kaydına taşıyoruz.
       if (e.oldVersion < 3) {
@@ -220,7 +225,7 @@ const DB = {
 
   // Tüm store'ları tek bir nesnede döndürür (JSON yedekleme için)
   async exportAll() {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'chatMesajlari', 'settings'];
     const result = {};
     for (const n of names) {
       result[n] = await DB.getAll(n);
@@ -230,7 +235,7 @@ const DB = {
 
   // JSON yedekten tüm store'ları geri yükler (önce temizler, sonra yazar)
   async importAll(data) {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'chatMesajlari', 'settings'];
     for (const n of names) {
       await DB.clear(n);
       if (Array.isArray(data[n]) && data[n].length) {
