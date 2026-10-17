@@ -9,6 +9,7 @@ const State = {
     homeworkAssignments: [],
     books: [],
     mockExams: [],
+    scans: [],
     settings: null,
   },
 
@@ -23,6 +24,7 @@ const State = {
     d.homeworkAssignments = await DB.getAll('homeworkAssignments');
     d.books = await DB.getAll('books');
     d.mockExams = await DB.getAll('mockExams');
+    d.scans = await DB.getAll('scans');
     const settingsRows = await DB.getAll('settings');
     d.settings = settingsRows.find((s) => s.id === 'main') || null;
 
@@ -96,6 +98,14 @@ const State = {
 
   getStudentMockExams(studentId) {
     return this.data.mockExams.filter((m) => m.studentId === studentId).sort((a, b) => (a.tarih || '').localeCompare(b.tarih || ''));
+  },
+
+  getStudentScans(studentId) {
+    return this.data.scans.filter((s) => s.studentId === studentId).sort((a, b) => (b.olusturmaTarihi || '').localeCompare(a.olusturmaTarihi || ''));
+  },
+
+  getOwnerScans(ownerId) {
+    return this.data.scans.filter((s) => s.ownerId === ownerId);
   },
 
   getHomeworkTask(id) {

@@ -49,6 +49,13 @@ const SettingsView = {
         </label>
       </div>
 
+      <div class="card">
+        <div class="card-title">Hesap</div>
+        <p class="muted small">Kullanıcı adı: ${Utils.escapeHtml(State.data.settings.auth?.username || '-')}</p>
+        <button class="btn btn-secondary btn-block" id="change-password">Şifre Değiştir</button>
+        <button class="btn btn-secondary btn-block" id="logout" style="margin-top:8px;">Çıkış Yap</button>
+      </div>
+
       <div class="card card-danger">
         <div class="card-title">Tehlikeli İşlemler</div>
         <button class="btn btn-danger btn-block" id="reset-all">Tüm Verileri Sıfırla</button>
@@ -159,12 +166,54 @@ const SettingsView = {
       }
     });
 
+    document.getElementById('logout').addEventListener('click', () => {
+      Auth.lock();
+      location.reload();
+    });
+
+    document.getElementById('change-password').addEventListener('click', () => {
+      Modal.open(`
+        <div class="modal-header">Şifre Değiştir</div>
+        <div class="modal-body">
+          <label class="field-label">Mevcut Şifre</label>
+          <input type="password" id="cp-current" class="input">
+          <label class="field-label">Yeni Kullanıcı Adı</label>
+          <input type="text" id="cp-username" class="input" value="${Utils.escapeHtml(State.data.settings.auth?.username || '')}">
+          <label class="field-label">Yeni Şifre</label>
+          <input type="password" id="cp-new" class="input">
+          <label class="field-label">Yeni Şifre (tekrar)</label>
+          <input type="password" id="cp-new2" class="input">
+          <div id="cp-errors" class="form-errors"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="cp-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="cp-save">Kaydet</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#cp-cancel').onclick = () => Modal.close();
+          root.querySelector('#cp-save').onclick = async () => {
+            const current = root.querySelector('#cp-current').value;
+            const newUsername = root.querySelector('#cp-username').value;
+            const newPass = root.querySelector('#cp-new').value;
+            const newPass2 = root.querySelector('#cp-new2').value;
+            const errBox = root.querySelector('#cp-errors');
+            if (newPass !== newPass2) { errBox.textContent = 'Yeni şifreler aynı değil.'; return; }
+            const result = await Auth.changePassword(current, newUsername, newPass);
+            if (!result.ok) { errBox.textContent = result.error; return; }
+            Modal.close();
+            Utils.toast('Şifre güncellendi.', 'success');
+          };
+        },
+      });
+    });
+
     document.getElementById('reset-all').addEventListener('click', async () => {
       const ok1 = await Confirm.ask('Tüm öğrenci ve kayıtlar kalıcı olarak silinecek. Önce yedek aldığından emin misin?', { danger: true, confirmText: 'Evet, Devam Et' });
       if (!ok1) return;
       const ok2 = await Confirm.ask('Bu işlem GERİ ALINAMAZ. Gerçekten tüm verileri silmek istiyor musun?', { danger: true, confirmText: 'Evet, Sil' });
       if (!ok2) return;
-      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams']) {
+      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans']) {
         await DB.clear(store);
       }
       await State.init();

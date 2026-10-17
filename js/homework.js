@@ -13,6 +13,7 @@ const Homework = {
       id: Utils.uid(),
       ad: form.ad.trim(),
       aciklama: form.aciklama || '',
+      cevapAnahtari: form.cevapAnahtari || '',
       verilisTarihi: form.verilisTarihi || Utils.todayISO(),
       teslimTarihi: form.teslimTarihi || null,
       olusturmaTarihi: new Date().toISOString(),
@@ -50,7 +51,10 @@ const Homework = {
 
   async deleteTask(taskId) {
     const assignments = State.data.homeworkAssignments.filter((a) => a.homeworkId === taskId);
-    for (const a of assignments) await State.remove('homeworkAssignments', a.id);
+    for (const a of assignments) {
+      for (const scan of State.getOwnerScans(a.id)) await State.remove('scans', scan.id);
+      await State.remove('homeworkAssignments', a.id);
+    }
     await State.remove('homeworkTasks', taskId);
   },
 

@@ -64,6 +64,13 @@ const StudentListView = {
           ${siniflar.map((s) => `<option value="${Utils.escapeHtml(s)}">${Utils.escapeHtml(s)}</option>`).join('')}
         </select>
       </div>
+      <div class="button-row">
+        <button class="btn btn-secondary" id="download-template">Excel Şablonu İndir</button>
+        <label class="btn btn-secondary" id="import-excel-label" style="text-align:center;">
+          Excel'den İçe Aktar
+          <input type="file" id="import-excel-input" accept=".xlsx,.xls" style="display:none;">
+        </label>
+      </div>
       <div id="student-list-container"></div>
       <button class="fab" id="add-student-fab" title="Öğrenci Ekle">+</button>
     `);
@@ -98,6 +105,53 @@ const StudentListView = {
     document.getElementById('student-sinif-filter').addEventListener('change', renderList);
     document.getElementById('add-student-fab').addEventListener('click', () => {
       openStudentForm(null, (student) => { location.hash = '#/ogrenci/' + student.id; });
+    });
+
+    document.getElementById('download-template').addEventListener('click', () => {
+      const rows = [
+        ['Ad Soyad', 'Okul No', 'Sınıf/Şube', 'Açıklama', 'Gözlem Notu'],
+        ['Örnek Öğrenci', '1001', '9/A', '', ''],
+      ];
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 30 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, ws, 'Öğrenciler');
+      XLSX.writeFile(wb, 'ogrenci_import_sablonu.xlsx');
+    });
+
+    document.getElementById('import-excel-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const firstSheet = wb.Sheets[wb.SheetNames[0]];
+        const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+        if (!rawRows.length) { Utils.toast('Dosyada okunacak satır bulunamadı.', 'error'); return; }
+
+        const { eklenen, atlananlar } = await Students.bulkImportFromSheetRows(rawRows);
+        const atlananHtml = atlananlar.length
+          ? `<p class="muted small" style="margin-top:8px;">Atlanan satırlar:</p><ul class="simple-list">${atlananlar.map((a) => `<li>Satır ${a.satir}: ${Utils.escapeHtml(a.sebep)}</li>`).join('')}</ul>`
+          : '';
+        Modal.open(`
+          <div class="modal-header">İçe Aktarma Tamamlandı</div>
+          <div class="modal-body">
+            <p>${eklenen} öğrenci eklendi.${atlananlar.length ? ` ${atlananlar.length} satır atlandı.` : ''}</p>
+            ${atlananHtml}
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-primary" id="import-done-close">Kapat</button>
+          </div>
+        `, {
+          onMount: (root) => {
+            root.querySelector('#import-done-close').onclick = () => { Modal.close(); renderList(); };
+          },
+        });
+      } catch (err) {
+        Utils.toast('Dosya okunamadı — geçerli bir Excel dosyası olduğundan emin ol.', 'error');
+      } finally {
+        e.target.value = '';
+      }
     });
 
     renderList();
@@ -263,6 +317,7 @@ const renderSinavTab = {
               <input type="date" id="s-tarih" class="input" value="${rec?.tarih || ''}">
               <label class="field-label">Açıklama</label>
               <textarea id="s-aciklama" class="input" rows="2">${Utils.escapeHtml(rec?.aciklama || '')}</textarea>
+              <button class="btn btn-secondary btn-block" id="s-scan" style="margin-top:10px;">📷 Kağıt Tara ve AI ile Değerlendir</button>
             </div>
             <div class="modal-actions">
               <button class="btn btn-secondary" id="s-cancel">Vazgeç</button>
@@ -280,6 +335,23 @@ const renderSinavTab = {
                 Modal.close();
                 Utils.toast('Not kaydedildi.', 'success');
                 renderTable();
+              };
+              root.querySelector('#s-scan').onclick = () => {
+                ScanFlow.start({
+                  studentId: student.id,
+                  ownerType: 'assessmentSlot',
+                  ownerId: `${termId}:${slotKey}`,
+                  context: `${slotDef.etiket} — ${student.ad}`,
+                  onApprove: async (puan, metin) => {
+                    const current = Assessments.getSlotRecord(student.id, termId, slotKey);
+                    await Assessments.saveSlot(student.id, termId, slotKey, {
+                      puan: puan,
+                      tarih: current?.tarih || Utils.todayISO(),
+                      aciklama: (current?.aciklama ? current.aciklama + '\n\n' : '') + 'AI değerlendirmesi: ' + metin,
+                    });
+                    renderTable();
+                  },
+                });
               };
             },
           });
@@ -332,6 +404,7 @@ const renderOdevTab = {
               <input type="number" step="0.01" id="hw-puan" class="input" value="${a.puan !== null && a.puan !== undefined ? a.puan : ''}">
               <label class="field-label">Öğretmen Notu</label>
               <textarea id="hw-not" class="input" rows="2">${Utils.escapeHtml(a.ogretmenNotu || '')}</textarea>
+              <button class="btn btn-secondary btn-block" id="hw-scan" style="margin-top:10px;">📷 Ödevi Tara ve AI ile Değerlendir</button>
             </div>
             <div class="modal-actions">
               <button class="btn btn-secondary" id="hw-cancel">Vazgeç</button>
@@ -340,6 +413,24 @@ const renderOdevTab = {
           `, {
             onMount: (root) => {
               root.querySelector('#hw-cancel').onclick = () => Modal.close();
+              root.querySelector('#hw-scan').onclick = () => {
+                const task = State.getHomeworkTask(a.homeworkId);
+                ScanFlow.start({
+                  studentId: student.id,
+                  ownerType: 'homeworkAssignment',
+                  ownerId: a.id,
+                  defaultRubric: task?.cevapAnahtari || '',
+                  context: `${task?.ad || 'Ödev'} — ${student.ad}`,
+                  onApprove: async (puan, metin) => {
+                    await Homework.updateAssignment(a.id, {
+                      durum: 'teslim edildi',
+                      puan: puan,
+                      ogretmenNotu: (a.ogretmenNotu ? a.ogretmenNotu + '\n\n' : '') + 'AI değerlendirmesi: ' + metin,
+                    });
+                    renderList();
+                  },
+                });
+              };
               root.querySelector('#hw-save').onclick = async () => {
                 await Homework.updateAssignment(a.id, {
                   durum: root.querySelector('#hw-durum').value,
@@ -368,6 +459,8 @@ const renderOdevTab = {
           <input type="date" id="ihw-verilis" class="input" value="${Utils.todayISO()}">
           <label class="field-label">Teslim Tarihi</label>
           <input type="date" id="ihw-teslim" class="input">
+          <label class="field-label">Cevap Anahtarı / Kriter (opsiyonel)</label>
+          <textarea id="ihw-cevapanahtari" class="input" rows="2"></textarea>
           <div id="ihw-errors" class="form-errors"></div>
         </div>
         <div class="modal-actions">
@@ -383,6 +476,7 @@ const renderOdevTab = {
               aciklama: root.querySelector('#ihw-aciklama').value,
               verilisTarihi: root.querySelector('#ihw-verilis').value,
               teslimTarihi: root.querySelector('#ihw-teslim').value,
+              cevapAnahtari: root.querySelector('#ihw-cevapanahtari').value,
             }, [student.id]);
             if (!result.ok) {
               root.querySelector('#ihw-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');

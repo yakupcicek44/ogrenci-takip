@@ -72,6 +72,7 @@ const Students = {
       ['homeworkAssignments', State.data.homeworkAssignments.filter((a) => a.studentId === id)],
       ['books', State.data.books.filter((b) => b.studentId === id)],
       ['mockExams', State.data.mockExams.filter((m) => m.studentId === id)],
+      ['scans', State.data.scans.filter((s) => s.studentId === id)],
     ];
     for (const [store, rows] of related) {
       for (const row of rows) {
@@ -79,6 +80,60 @@ const Students = {
       }
     }
     await State.remove('students', id);
+  },
+
+  EXCEL_HEADER_ALIASES: {
+    ad: ['ad soyad', 'ad-soyad', 'adsoyad', 'ad', 'isim', 'öğrenci adı', 'ogrenci adi'],
+    okulNo: ['okul no', 'okul numarası', 'okul numarasi', 'no', 'öğrenci no', 'ogrenci no', 'numara'],
+    sinif: ['sınıf/şube', 'sinif/sube', 'sınıf', 'sinif', 'şube', 'sube', 'sınıf-şube'],
+    aciklama: ['açıklama', 'aciklama'],
+    gozlemNotlari: ['gözlem notu', 'gözlem notları', 'gozlem notu', 'gozlem notlari', 'öğretmen gözlem notları'],
+  },
+
+  // XLSX.utils.sheet_to_json çıktısındaki bir satırı (başlık->değer) uygulamanın
+  // alan adlarına eşler. Başlıklar Türkçe varyasyonlara karşı esnek eşleştirilir.
+  mapExcelRow(rawRow) {
+    const lowerKeys = {};
+    for (const key of Object.keys(rawRow)) {
+      lowerKeys[key.trim().toLocaleLowerCase('tr')] = key;
+    }
+    const pick = (aliases) => {
+      for (const alias of aliases) {
+        if (lowerKeys[alias] !== undefined) {
+          const v = rawRow[lowerKeys[alias]];
+          return v === undefined || v === null ? '' : String(v).trim();
+        }
+      }
+      return '';
+    };
+    return {
+      ad: pick(this.EXCEL_HEADER_ALIASES.ad),
+      okulNo: pick(this.EXCEL_HEADER_ALIASES.okulNo),
+      sinif: pick(this.EXCEL_HEADER_ALIASES.sinif),
+      aciklama: pick(this.EXCEL_HEADER_ALIASES.aciklama),
+      gozlemNotlari: pick(this.EXCEL_HEADER_ALIASES.gozlemNotlari),
+    };
+  },
+
+  // rawRows: XLSX.utils.sheet_to_json(sheet, {defval:''}) çıktısı.
+  // Tamamen boş satırlar sessizce atlanır (şablon/örnek kalıntıları için).
+  async bulkImportFromSheetRows(rawRows) {
+    let eklenen = 0;
+    const atlananlar = [];
+    for (let i = 0; i < rawRows.length; i++) {
+      const satirNo = i + 2; // 1. satır başlık
+      const form = this.mapExcelRow(rawRows[i]);
+      const tamamenBos = !form.ad && !form.okulNo && !form.sinif;
+      if (tamamenBos) continue;
+
+      const result = await this.create(form);
+      if (result.ok) {
+        eklenen++;
+      } else {
+        atlananlar.push({ satir: satirNo, sebep: result.errors.join(' ') });
+      }
+    }
+    return { eklenen, atlananlar };
   },
 
   search(query, sinifFilter) {

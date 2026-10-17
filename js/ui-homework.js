@@ -13,6 +13,8 @@ const HomeworkView = {
         <input type="date" id="new-hw-verilis" class="input" value="${Utils.todayISO()}">
         <label class="field-label">Teslim Tarihi</label>
         <input type="date" id="new-hw-teslim" class="input">
+        <label class="field-label">Cevap Anahtarı / Kriter (opsiyonel — AI ile tarama değerlendirmesinde kullanılır)</label>
+        <textarea id="new-hw-cevapanahtari" class="input" rows="2"></textarea>
 
         <label class="field-label">Öğrenciler</label>
         <select id="new-hw-sinif-filter" class="input">
@@ -69,6 +71,7 @@ const HomeworkView = {
         aciklama: document.getElementById('new-hw-aciklama').value,
         verilisTarihi: document.getElementById('new-hw-verilis').value,
         teslimTarihi: document.getElementById('new-hw-teslim').value,
+        cevapAnahtari: document.getElementById('new-hw-cevapanahtari').value,
       };
       const result = await Homework.assign(form, selected);
       const errBox = document.getElementById('new-hw-errors');
@@ -80,6 +83,7 @@ const HomeworkView = {
       document.getElementById('new-hw-ad').value = '';
       document.getElementById('new-hw-aciklama').value = '';
       document.getElementById('new-hw-teslim').value = '';
+      document.getElementById('new-hw-cevapanahtari').value = '';
       document.querySelectorAll('.hw-student-checkbox').forEach((cb) => { cb.checked = false; });
       Utils.toast(`Ödev ${selected.length} öğrenciye atandı.`, 'success');
       renderAssignmentList();
@@ -100,6 +104,7 @@ const HomeworkView = {
           <input type="number" step="0.01" id="ehw-puan" class="input" value="${a.puan ?? ''}">
           <label class="field-label">Öğretmen Notu</label>
           <textarea id="ehw-not" class="input" rows="2">${Utils.escapeHtml(a.ogretmenNotu || '')}</textarea>
+          <button class="btn btn-secondary btn-block" id="ehw-scan" style="margin-top:10px;">📷 Ödevi Tara ve AI ile Değerlendir</button>
         </div>
         <div class="modal-actions">
           <button class="btn btn-secondary" id="ehw-cancel">Vazgeç</button>
@@ -108,6 +113,23 @@ const HomeworkView = {
       `, {
         onMount: (root) => {
           root.querySelector('#ehw-cancel').onclick = () => Modal.close();
+          root.querySelector('#ehw-scan').onclick = () => {
+            ScanFlow.start({
+              studentId: a.studentId,
+              ownerType: 'homeworkAssignment',
+              ownerId: a.id,
+              defaultRubric: task?.cevapAnahtari || '',
+              context: `${task?.ad || 'Ödev'} — ${student?.ad || ''}`,
+              onApprove: async (puan, metin) => {
+                await Homework.updateAssignment(a.id, {
+                  durum: 'teslim edildi',
+                  puan: puan,
+                  ogretmenNotu: (a.ogretmenNotu ? a.ogretmenNotu + '\n\n' : '') + 'AI değerlendirmesi: ' + metin,
+                });
+                renderAssignmentList();
+              },
+            });
+          };
           root.querySelector('#ehw-save').onclick = async () => {
             await Homework.updateAssignment(a.id, {
               durum: root.querySelector('#ehw-durum').value,

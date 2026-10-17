@@ -44,7 +44,23 @@ async function registerServiceWorker() {
   }
 }
 
-window.addEventListener('hashchange', () => Router.render());
+window.addEventListener('hashchange', () => {
+  if (Auth.isUnlocked()) Router.render();
+});
+
+async function boot() {
+  document.getElementById('bottom-nav').style.display = '';
+  if (!location.hash) location.hash = '#/';
+  await Router.render();
+  registerServiceWorker();
+  Utils.markSaved();
+}
+
+function showLogin() {
+  document.getElementById('bottom-nav').style.display = 'none';
+  document.getElementById('app').innerHTML = LoginView.html();
+  LoginView.mount(boot);
+}
 
 window.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -56,8 +72,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     </div></div>`;
     return;
   }
-  if (!location.hash) location.hash = '#/';
-  await Router.render();
-  registerServiceWorker();
-  Utils.markSaved();
+
+  if (Auth.isUnlocked()) {
+    await boot();
+  } else {
+    showLogin(); // Auth.isSetup() durumuna göre giriş veya ilk kurulum formu gösterir
+  }
 });
