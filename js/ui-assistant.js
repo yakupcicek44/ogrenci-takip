@@ -6,6 +6,7 @@ const ASSISTANT_TABS = [
   { key: 'notlar', label: 'Notlar' },
   { key: 'belgeler', label: 'Belgeler' },
   { key: 'ders-programi', label: 'Ders Programı' },
+  { key: 'sohbet', label: 'Sohbet' },
 ];
 
 const AssistantView = {
@@ -22,7 +23,7 @@ const AssistantView = {
   mount(params) {
     const tab = params.tab || 'gorevler';
     const container = document.getElementById('assistant-tab-content');
-    const renderers = { gorevler: renderGorevlerTab, hatirlaticilar: renderHatirlaticilarTab, notlar: renderNotlarTab, belgeler: renderBelgelerTab, 'ders-programi': renderDersProgramiTab };
+    const renderers = { gorevler: renderGorevlerTab, hatirlaticilar: renderHatirlaticilarTab, notlar: renderNotlarTab, belgeler: renderBelgelerTab, 'ders-programi': renderDersProgramiTab, sohbet: renderSohbetTab };
     const renderer = renderers[tab] || renderGorevlerTab;
     container.innerHTML = renderer.html();
     renderer.mount();
@@ -765,5 +766,170 @@ const renderDersProgramiTab = {
 
     renderWeek();
     renderEkDersList();
+  },
+};
+
+// ---- Sohbet (Gemini AI asistanı — function calling ile hatırlatıcı/görev/not/ders programı ekleme) ----
+const renderSohbetTab = {
+  html() {
+    return `
+      <div class="card" style="margin-bottom:10px;">
+        <p class="muted small">
+          Bu sohbet Google Gemini'ye bağlanır — yazdığın mesaj ve (varsa) fotoğraf analiz için
+          gönderilir. Eklediğin hatırlatıcı/görev/not/ders kaydı <strong>anında kaydedilir,
+          onay istenmez</strong> — yanlışsa mesajın altındaki "Geri Al"ı kullan.
+        </p>
+      </div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div id="chat-photo-preview" class="chat-photo-preview" style="display:none;"></div>
+      <div class="chat-input-row">
+        <button class="btn btn-secondary btn-sm" id="chat-photo-btn" title="Fotoğraf ekle" aria-label="Fotoğraf ekle">📷</button>
+        <button class="btn btn-secondary btn-sm" id="chat-mic-btn" title="Sesle yaz" aria-label="Sesle yaz" style="display:none;">🎤</button>
+        <input type="text" id="chat-input" class="input" placeholder="Bir şey sor veya ekle...">
+        <button class="btn btn-primary btn-sm" id="chat-send-btn">Gönder</button>
+      </div>
+    `;
+  },
+
+  mount() {
+    let history = []; // {role:'user'|'model', text}
+    let pendingImage = null; // {dataUrl, mimeType} — gönderilince silinir, hiçbir yere kaydedilmez
+    const messagesEl = document.getElementById('chat-messages');
+
+    const addBubble = (html) => {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = html;
+      messagesEl.appendChild(wrap.firstElementChild);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    };
+
+    const renderUserBubble = (text, imageDataUrl) => {
+      addBubble(`
+        <div class="chat-bubble chat-bubble-user">
+          ${imageDataUrl ? `<img src="${imageDataUrl}" style="max-width:120px;border-radius:8px;display:block;margin-bottom:6px;">` : ''}
+          ${Utils.escapeHtml(text)}
+        </div>
+      `);
+    };
+
+    const renderAssistantText = (text) => {
+      addBubble(`<div class="chat-bubble chat-bubble-assistant">${Utils.escapeHtml(text)}</div>`);
+    };
+
+    const renderError = (text) => {
+      addBubble(`<div class="chat-bubble chat-bubble-error">⚠️ ${Utils.escapeHtml(text)}</div>`);
+    };
+
+    const renderActionBubble = (ozet, store, id) => {
+      addBubble(`
+        <div class="chat-bubble chat-bubble-action">
+          ✅ ${Utils.escapeHtml(ozet)}
+          <button class="btn btn-secondary btn-sm chat-undo-btn" style="margin-top:6px;">Geri Al</button>
+        </div>
+      `);
+      const btn = messagesEl.lastElementChild.querySelector('.chat-undo-btn');
+      btn.onclick = async () => {
+        await AiChat.undo(store, id);
+        btn.disabled = true;
+        btn.textContent = 'Geri alındı';
+        btn.closest('.chat-bubble').style.opacity = '0.55';
+      };
+    };
+
+    const sendMessage = async () => {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text && !pendingImage) return;
+      input.value = '';
+      const imageForThisMessage = pendingImage;
+      pendingImage = null;
+      document.getElementById('chat-photo-preview').style.display = 'none';
+      document.getElementById('chat-photo-preview').innerHTML = '';
+
+      renderUserBubble(text || '(fotoğraf)', imageForThisMessage?.dataUrl);
+      const sendBtn = document.getElementById('chat-send-btn');
+      sendBtn.disabled = true;
+
+      try {
+        const data = await AiChat.send(text, history, imageForThisMessage);
+        history.push({ role: 'user', text });
+        if (data.action) {
+          const result = await AiChat.executeAction(data.action);
+          if (result.ok) {
+            renderActionBubble(result.ozet, result.store, result.id);
+            history.push({ role: 'model', text: result.ozet });
+          } else {
+            renderError('Eylem uygulanamadı: ' + result.error);
+          }
+        } else {
+          renderAssistantText(data.replyText || '(yanıt alınamadı)');
+          history.push({ role: 'model', text: data.replyText || '' });
+        }
+        history = history.slice(-10);
+      } catch (e) {
+        renderError(e.message);
+      } finally {
+        sendBtn.disabled = false;
+      }
+    };
+
+    document.getElementById('chat-send-btn').addEventListener('click', sendMessage);
+    document.getElementById('chat-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    document.getElementById('chat-photo-btn').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+      input.addEventListener('change', async () => {
+        const file = input.files[0];
+        document.body.removeChild(input);
+        if (!file) return;
+        try {
+          pendingImage = await Scan.compressImageFile(file);
+          const preview = document.getElementById('chat-photo-preview');
+          preview.innerHTML = `<img src="${pendingImage.dataUrl}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;"><button class="btn btn-secondary btn-sm" id="chat-photo-remove">Kaldır</button>`;
+          preview.style.display = 'flex';
+          document.getElementById('chat-photo-remove').onclick = () => {
+            pendingImage = null;
+            preview.style.display = 'none';
+            preview.innerHTML = '';
+          };
+        } catch (e) {
+          Utils.toast('Görsel işlenemedi: ' + e.message, 'error');
+        }
+      });
+      input.click();
+    });
+
+    // Sesle yazma — sadece tarayıcı destekliyorsa (çoğu Android Chrome) gösterilir,
+    // desteklemiyorsa buton hiç görünmez (yanıltıcı/çalışmayan bir özellik sunmamak için).
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+      const micBtn = document.getElementById('chat-mic-btn');
+      micBtn.style.display = '';
+      let recognizing = false;
+      const rec = new SpeechRec();
+      rec.lang = 'tr-TR';
+      rec.interimResults = false;
+      rec.onresult = (e) => {
+        const said = e.results[0][0].transcript;
+        const input = document.getElementById('chat-input');
+        input.value = (input.value ? input.value + ' ' : '') + said;
+      };
+      rec.onend = () => { recognizing = false; micBtn.classList.remove('active'); };
+      micBtn.addEventListener('click', () => {
+        if (recognizing) { rec.stop(); return; }
+        recognizing = true;
+        micBtn.classList.add('active');
+        rec.start();
+      });
+    }
+
+    renderAssistantText('Merhaba! Ders programını, görevlerini veya hatırlatıcılarını sorabilir, ya da yeni bir şey eklememi isteyebilirsin.');
   },
 };
