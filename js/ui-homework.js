@@ -167,7 +167,7 @@ const HomeworkView = {
                 await Homework.updateAssignment(a.id, {
                   durum: 'teslim edildi',
                   puan: puan,
-                  ogretmenNotu: (a.ogretmenNotu ? a.ogretmenNotu + '\n\n' : '') + 'AI değerlendirmesi: ' + metin,
+                  ogretmenNotu: (a.ogretmenNotu ? a.ogretmenNotu + '\n\n' : '') + metin,
                 });
                 renderAssignmentList();
               },

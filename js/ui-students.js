@@ -495,7 +495,7 @@ const renderSinavTab = {
                     await Assessments.saveSlot(student.id, termId, slotKey, {
                       puan: puan,
                       tarih: current?.tarih || Utils.todayISO(),
-                      aciklama: (current?.aciklama ? current.aciklama + '\n\n' : '') + 'AI değerlendirmesi: ' + metin,
+                      aciklama: (current?.aciklama ? current.aciklama + '\n\n' : '') + metin,
                     });
                     renderTable();
                   },
@@ -573,7 +573,7 @@ const renderOdevTab = {
                     await Homework.updateAssignment(a.id, {
                       durum: 'teslim edildi',
                       puan: puan,
-                      ogretmenNotu: (a.ogretmenNotu ? a.ogretmenNotu + '\n\n' : '') + 'AI değerlendirmesi: ' + metin,
+                      ogretmenNotu: (a.ogretmenNotu ? a.ogretmenNotu + '\n\n' : '') + metin,
                     });
                     renderList();
                   },
@@ -976,9 +976,9 @@ const renderGelisimTab = {
             <div class="list">
               ${scans.map((s) => `
                 <div class="list-item" data-id="${s.id}" style="align-items:flex-start;">
-                  <img src="${s.imageDataUrl}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;">
+                  <img src="${(s.imageDataUrls && s.imageDataUrls[0]) || s.imageDataUrl}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;">
                   <div class="list-item-main">
-                    <div class="list-item-title">${Utils.formatDateTimeTR(s.olusturmaTarihi)} · <span class="badge badge-${s.durum === 'onaylandi' ? 'teslim-edildi' : s.durum === 'reddedildi' ? 'eksik' : 'bekliyor'}">${s.durum}</span></div>
+                    <div class="list-item-title">${Utils.formatDateTimeTR(s.olusturmaTarihi)}${s.imageDataUrls && s.imageDataUrls.length > 1 ? ` · <span class="badge">${s.imageDataUrls.length} sayfa</span>` : ''} · <span class="badge badge-${s.durum === 'onaylandi' ? 'teslim-edildi' : s.durum === 'reddedildi' ? 'eksik' : 'bekliyor'}">${s.durum}</span></div>
                     <div class="list-item-sub">${Utils.escapeHtml(s.context || '')}${s.aiOnerilenPuan !== null && s.aiOnerilenPuan !== undefined ? ' · Puan: ' + s.aiOnerilenPuan : ''}</div>
                     <div class="list-item-sub">${Utils.escapeHtml(s.aiMetin || '')}</div>
                   </div>
