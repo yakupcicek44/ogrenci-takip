@@ -1,0 +1,652 @@
+// Öğrenci listesi + öğrenci detay (6 sekme)
+function studentFormHtml(student) {
+  return `
+    <div class="modal-header">${student ? 'Öğrenciyi Düzenle' : 'Yeni Öğrenci'}</div>
+    <div class="modal-body">
+      <label class="field-label">Ad Soyad *</label>
+      <input type="text" id="f-ad" class="input" value="${Utils.escapeHtml(student?.ad || '')}">
+
+      <label class="field-label">Okul Numarası *</label>
+      <input type="text" id="f-okulNo" class="input" value="${Utils.escapeHtml(student?.okulNo || '')}">
+
+      <label class="field-label">Sınıf/Şube *</label>
+      <input type="text" id="f-sinif" class="input" placeholder="Örn: 9/A" value="${Utils.escapeHtml(student?.sinif || '')}">
+
+      <label class="field-label">Açıklama</label>
+      <textarea id="f-aciklama" class="input" rows="2">${Utils.escapeHtml(student?.aciklama || '')}</textarea>
+
+      <label class="field-label">Öğretmen Gözlem Notları</label>
+      <textarea id="f-gozlem" class="input" rows="3">${Utils.escapeHtml(student?.gozlemNotlari || '')}</textarea>
+
+      <div id="form-errors" class="form-errors"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="f-cancel">Vazgeç</button>
+      <button class="btn btn-primary" id="f-save">Kaydet</button>
+    </div>
+  `;
+}
+
+function openStudentForm(studentId, onSaved) {
+  const student = studentId ? State.getStudent(studentId) : null;
+  Modal.open(studentFormHtml(student), {
+    onMount: (root) => {
+      root.querySelector('#f-cancel').onclick = () => Modal.close();
+      root.querySelector('#f-save').onclick = async () => {
+        const form = {
+          ad: root.querySelector('#f-ad').value,
+          okulNo: root.querySelector('#f-okulNo').value,
+          sinif: root.querySelector('#f-sinif').value,
+          aciklama: root.querySelector('#f-aciklama').value,
+          gozlemNotlari: root.querySelector('#f-gozlem').value,
+        };
+        const result = student ? await Students.update(student.id, form) : await Students.create(form);
+        if (!result.ok) {
+          root.querySelector('#form-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
+          return;
+        }
+        Modal.close();
+        Utils.toast('Öğrenci kaydedildi.', 'success');
+        if (onSaved) onSaved(result.student);
+      };
+    },
+  });
+}
+
+const StudentListView = {
+  html() {
+    const siniflar = State.getSiniflar();
+    return pageWrap('Öğrenciler', `
+      <div class="toolbar">
+        <input type="text" id="student-search" class="input" placeholder="Ad veya okul no ara...">
+        <select id="student-sinif-filter" class="input">
+          <option value="">Tüm Sınıflar</option>
+          ${siniflar.map((s) => `<option value="${Utils.escapeHtml(s)}">${Utils.escapeHtml(s)}</option>`).join('')}
+        </select>
+      </div>
+      <div id="student-list-container"></div>
+      <button class="fab" id="add-student-fab" title="Öğrenci Ekle">+</button>
+    `);
+  },
+
+  mount() {
+    const renderList = () => {
+      const q = document.getElementById('student-search').value;
+      const sinif = document.getElementById('student-sinif-filter').value;
+      const list = Students.search(q, sinif);
+      const container = document.getElementById('student-list-container');
+      if (!list.length) {
+        container.innerHTML = emptyState('Kayıtlı öğrenci bulunamadı.', '🧑‍🎓');
+        return;
+      }
+      container.innerHTML = `
+        <div class="list">
+          ${list.map((s) => `
+            <a href="#/ogrenci/${s.id}" class="list-item ${s.durum === 'pasif' ? 'list-item-muted' : ''}">
+              <div class="list-item-main">
+                <div class="list-item-title">${Utils.escapeHtml(s.ad)}${s.durum === 'pasif' ? ' <span class="badge">pasif</span>' : ''}</div>
+                <div class="list-item-sub">No: ${Utils.escapeHtml(s.okulNo)} · ${Utils.escapeHtml(s.sinif)}</div>
+              </div>
+              <div class="list-item-arrow">›</div>
+            </a>
+          `).join('')}
+        </div>
+      `;
+    };
+
+    document.getElementById('student-search').addEventListener('input', Utils.debounce(renderList, 150));
+    document.getElementById('student-sinif-filter').addEventListener('change', renderList);
+    document.getElementById('add-student-fab').addEventListener('click', () => {
+      openStudentForm(null, (student) => { location.hash = '#/ogrenci/' + student.id; });
+    });
+
+    renderList();
+
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    if (params.get('ekle') === '1') {
+      openStudentForm(null, (student) => { location.hash = '#/ogrenci/' + student.id; });
+    }
+  },
+};
+
+const STUDENT_TABS = [
+  { key: 'genel', label: 'Genel Bilgiler' },
+  { key: 'sinav', label: 'Sınav/Performans' },
+  { key: 'odev', label: 'Ödev Takibi' },
+  { key: 'kitap', label: 'Kitap Okuma' },
+  { key: 'deneme', label: 'Deneme Sonuçları' },
+  { key: 'gelisim', label: 'Gelişim Geçmişi' },
+];
+
+const StudentDetailView = {
+  html(params) {
+    const student = State.getStudent(params.id);
+    if (!student) return pageWrap('Öğrenci Bulunamadı', emptyState('Bu öğrenci silinmiş olabilir.'), { back: '#/ogrenciler' });
+
+    const tab = params.tab || 'genel';
+    return pageWrap(student.ad, `
+      <div class="tabs">
+        ${STUDENT_TABS.map((t) => `
+          <a href="#/ogrenci/${student.id}/${t.key}" class="tab ${t.key === tab ? 'tab-active' : ''}">${t.label}</a>
+        `).join('')}
+      </div>
+      <div id="tab-content" class="tab-content"></div>
+    `, { back: '#/ogrenciler' });
+  },
+
+  mount(params) {
+    const student = State.getStudent(params.id);
+    if (!student) return;
+    const tab = params.tab || 'genel';
+    const container = document.getElementById('tab-content');
+    const renderers = {
+      genel: renderGenelTab,
+      sinav: renderSinavTab,
+      odev: renderOdevTab,
+      kitap: renderKitapTab,
+      deneme: renderDenemeTab,
+      gelisim: renderGelisimTab,
+    };
+    const renderer = renderers[tab] || renderGenelTab;
+    container.innerHTML = renderer.html(student);
+    renderer.mount(student);
+  },
+};
+
+// ---- Genel Bilgiler ----
+const renderGenelTab = {
+  html(student) {
+    return `
+      <div class="card">
+        <div class="card-title">Kimlik Bilgileri</div>
+        <div class="kv-row"><span>Ad Soyad</span><strong>${Utils.escapeHtml(student.ad)}</strong></div>
+        <div class="kv-row"><span>Okul No</span><strong>${Utils.escapeHtml(student.okulNo)}</strong></div>
+        <div class="kv-row"><span>Sınıf/Şube</span><strong>${Utils.escapeHtml(student.sinif)}</strong></div>
+        <div class="kv-row"><span>Durum</span><strong>${student.durum === 'pasif' ? 'Pasif' : 'Aktif'}</strong></div>
+        <button class="btn btn-secondary btn-block" id="edit-genel">Düzenle</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Açıklama</div>
+        <p class="muted">${Utils.escapeHtml(student.aciklama) || '<em>Girilmemiş</em>'}</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Öğretmen Gözlem Notları</div>
+        <p class="muted">${Utils.escapeHtml(student.gozlemNotlari) || '<em>Girilmemiş</em>'}</p>
+      </div>
+
+      <div class="card card-danger">
+        <div class="card-title">Tehlikeli İşlemler</div>
+        <button class="btn btn-secondary btn-block" id="toggle-pasif">${student.durum === 'pasif' ? 'Aktif Yap' : 'Pasif Yap'}</button>
+        <button class="btn btn-danger btn-block" id="delete-student" style="margin-top:8px">Öğrenciyi ve Tüm Kayıtlarını Sil</button>
+      </div>
+    `;
+  },
+  mount(student) {
+    document.getElementById('edit-genel').onclick = () => {
+      openStudentForm(student.id, () => Router.render());
+    };
+    document.getElementById('toggle-pasif').onclick = async () => {
+      await Students.setPasif(student.id, student.durum !== 'pasif');
+      Utils.toast('Durum güncellendi.', 'success');
+      Router.render();
+    };
+    document.getElementById('delete-student').onclick = async () => {
+      const ok = await Confirm.ask(
+        `${student.ad} adlı öğrenci ve TÜM kayıtları (notlar, ödevler, kitaplar, denemeler) kalıcı olarak silinecek. Bu işlem geri alınamaz. Onaylıyor musun?`,
+        { danger: true, confirmText: 'Evet, Sil' }
+      );
+      if (!ok) return;
+      await Students.hardDelete(student.id);
+      Utils.toast('Öğrenci silindi.', 'success');
+      location.hash = '#/ogrenciler';
+    };
+  },
+};
+
+// ---- Sınav / Performans ----
+const renderSinavTab = {
+  html(student) {
+    const terms = State.getTermsSorted();
+    return `
+      <div class="field-inline">
+        <label>Dönem:</label>
+        <select id="sinav-term-select" class="input">
+          ${terms.map((t) => `<option value="${t.id}">${Utils.escapeHtml(t.ad)}</option>`).join('')}
+        </select>
+      </div>
+      <div id="sinav-table-container"></div>
+    `;
+  },
+  mount(student) {
+    const select = document.getElementById('sinav-term-select');
+    const renderTable = () => {
+      const termId = select.value;
+      const container = document.getElementById('sinav-table-container');
+      const ortalama = Assessments.calcTermAverage(student.id, termId);
+      container.innerHTML = `
+        <div class="list">
+          ${Assessments.SLOTS.map((slotDef) => {
+            const rec = Assessments.getSlotRecord(student.id, termId, slotDef.key);
+            return `
+              <div class="list-item" data-slot="${slotDef.key}">
+                <div class="list-item-main">
+                  <div class="list-item-title">${slotDef.etiket}</div>
+                  <div class="list-item-sub">
+                    Not: ${rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '<em>girilmedi</em>'}
+                    ${rec && rec.tarih ? ' · ' + Utils.formatDateTR(rec.tarih) : ''}
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-sm edit-slot" data-slot="${slotDef.key}">Düzenle</button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="card">
+          <div class="kv-row"><span>Dönem Ortalaması</span><strong>${ortalama !== null ? ortalama : '-'}</strong></div>
+          <p class="muted small">Ağırlıklar Ayarlar sekmesinden değiştirilebilir. Boş notlar sıfır sayılmaz, ortalamaya dahil edilmez.</p>
+        </div>
+      `;
+
+      container.querySelectorAll('.edit-slot').forEach((btn) => {
+        btn.onclick = () => {
+          const slotKey = btn.dataset.slot;
+          const slotDef = Assessments.SLOTS.find((s) => s.key === slotKey);
+          const rec = Assessments.getSlotRecord(student.id, termId, slotKey);
+          Modal.open(`
+            <div class="modal-header">${slotDef.etiket}</div>
+            <div class="modal-body">
+              <label class="field-label">Not (boş bırakılabilir)</label>
+              <input type="number" step="0.01" id="s-puan" class="input" value="${rec && rec.puan !== null ? rec.puan : ''}">
+              <label class="field-label">Tarih</label>
+              <input type="date" id="s-tarih" class="input" value="${rec?.tarih || ''}">
+              <label class="field-label">Açıklama</label>
+              <textarea id="s-aciklama" class="input" rows="2">${Utils.escapeHtml(rec?.aciklama || '')}</textarea>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-secondary" id="s-cancel">Vazgeç</button>
+              <button class="btn btn-primary" id="s-save">Kaydet</button>
+            </div>
+          `, {
+            onMount: (root) => {
+              root.querySelector('#s-cancel').onclick = () => Modal.close();
+              root.querySelector('#s-save').onclick = async () => {
+                await Assessments.saveSlot(student.id, termId, slotKey, {
+                  puan: root.querySelector('#s-puan').value,
+                  tarih: root.querySelector('#s-tarih').value,
+                  aciklama: root.querySelector('#s-aciklama').value,
+                });
+                Modal.close();
+                Utils.toast('Not kaydedildi.', 'success');
+                renderTable();
+              };
+            },
+          });
+        };
+      });
+    };
+    select.addEventListener('change', renderTable);
+    renderTable();
+  },
+};
+
+// ---- Ödev Takibi ----
+const renderOdevTab = {
+  html(student) {
+    const assignments = State.getStudentHomework(student.id);
+    return `
+      <button class="btn btn-secondary btn-block" id="add-individual-hw">+ Bireysel Ödev Ata</button>
+      <div class="list" id="hw-list">
+        ${assignments.length ? '' : emptyState('Henüz ödev atanmadı.', '📝')}
+      </div>
+    `;
+  },
+  mount(student) {
+    const listEl = document.getElementById('hw-list');
+    const renderList = () => {
+      const assignments = State.getStudentHomework(student.id).map((a) => ({ ...a, task: State.getHomeworkTask(a.homeworkId) })).filter((a) => a.task);
+      if (!assignments.length) { listEl.innerHTML = emptyState('Henüz ödev atanmadı.', '📝'); return; }
+      assignments.sort((a, b) => (b.task.verilisTarihi || '').localeCompare(a.task.verilisTarihi || ''));
+      listEl.innerHTML = assignments.map((a) => `
+        <div class="list-item" data-id="${a.id}">
+          <div class="list-item-main">
+            <div class="list-item-title">${Utils.escapeHtml(a.task.ad)}</div>
+            <div class="list-item-sub">Teslim: ${Utils.formatDateTR(a.task.teslimTarihi)} · Durum: <span class="badge badge-${a.durum.replace(/\s/g, '-')}">${a.durum}</span></div>
+          </div>
+          <button class="btn btn-secondary btn-sm edit-hw" data-id="${a.id}">Düzenle</button>
+        </div>
+      `).join('');
+
+      listEl.querySelectorAll('.edit-hw').forEach((btn) => {
+        btn.onclick = () => {
+          const a = State.data.homeworkAssignments.find((x) => x.id === btn.dataset.id);
+          Modal.open(`
+            <div class="modal-header">${Utils.escapeHtml(State.getHomeworkTask(a.homeworkId)?.ad || '')}</div>
+            <div class="modal-body">
+              <label class="field-label">Durum</label>
+              <select id="hw-durum" class="input">
+                ${Homework.DURUMLAR.map((d) => `<option value="${d}" ${d === a.durum ? 'selected' : ''}>${d}</option>`).join('')}
+              </select>
+              <label class="field-label">Puan</label>
+              <input type="number" step="0.01" id="hw-puan" class="input" value="${a.puan !== null && a.puan !== undefined ? a.puan : ''}">
+              <label class="field-label">Öğretmen Notu</label>
+              <textarea id="hw-not" class="input" rows="2">${Utils.escapeHtml(a.ogretmenNotu || '')}</textarea>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-secondary" id="hw-cancel">Vazgeç</button>
+              <button class="btn btn-primary" id="hw-save">Kaydet</button>
+            </div>
+          `, {
+            onMount: (root) => {
+              root.querySelector('#hw-cancel').onclick = () => Modal.close();
+              root.querySelector('#hw-save').onclick = async () => {
+                await Homework.updateAssignment(a.id, {
+                  durum: root.querySelector('#hw-durum').value,
+                  puan: root.querySelector('#hw-puan').value,
+                  ogretmenNotu: root.querySelector('#hw-not').value,
+                });
+                Modal.close();
+                Utils.toast('Ödev güncellendi.', 'success');
+                renderList();
+              };
+            },
+          });
+        };
+      });
+    };
+
+    document.getElementById('add-individual-hw').onclick = () => {
+      Modal.open(`
+        <div class="modal-header">Bireysel Ödev Ata</div>
+        <div class="modal-body">
+          <label class="field-label">Ödev Adı *</label>
+          <input type="text" id="ihw-ad" class="input">
+          <label class="field-label">Açıklama</label>
+          <textarea id="ihw-aciklama" class="input" rows="2"></textarea>
+          <label class="field-label">Veriliş Tarihi</label>
+          <input type="date" id="ihw-verilis" class="input" value="${Utils.todayISO()}">
+          <label class="field-label">Teslim Tarihi</label>
+          <input type="date" id="ihw-teslim" class="input">
+          <div id="ihw-errors" class="form-errors"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="ihw-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="ihw-save">Ata</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#ihw-cancel').onclick = () => Modal.close();
+          root.querySelector('#ihw-save').onclick = async () => {
+            const result = await Homework.assign({
+              ad: root.querySelector('#ihw-ad').value,
+              aciklama: root.querySelector('#ihw-aciklama').value,
+              verilisTarihi: root.querySelector('#ihw-verilis').value,
+              teslimTarihi: root.querySelector('#ihw-teslim').value,
+            }, [student.id]);
+            if (!result.ok) {
+              root.querySelector('#ihw-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
+              return;
+            }
+            Modal.close();
+            Utils.toast('Ödev atandı.', 'success');
+            renderList();
+          };
+        },
+      });
+    };
+
+    renderList();
+  },
+};
+
+// ---- Kitap Okuma ----
+const renderKitapTab = {
+  html(student) {
+    return `
+      <button class="btn btn-secondary btn-block" id="add-book">+ Kitap Ekle</button>
+      <div class="list" id="book-list"></div>
+    `;
+  },
+  mount(student) {
+    const listEl = document.getElementById('book-list');
+
+    const openBookForm = (book) => {
+      Modal.open(`
+        <div class="modal-header">${book ? 'Kitabı Düzenle' : 'Yeni Kitap'}</div>
+        <div class="modal-body">
+          <label class="field-label">Kitap Adı *</label>
+          <input type="text" id="bk-ad" class="input" value="${Utils.escapeHtml(book?.kitapAdi || '')}">
+          <label class="field-label">Yazar</label>
+          <input type="text" id="bk-yazar" class="input" value="${Utils.escapeHtml(book?.yazar || '')}">
+          <label class="field-label">Sayfa Sayısı</label>
+          <input type="number" id="bk-sayfa" class="input" value="${book?.sayfaSayisi ?? ''}">
+          <label class="field-label">Başlangıç Tarihi</label>
+          <input type="date" id="bk-baslangic" class="input" value="${book?.baslangicTarihi || ''}">
+          <label class="field-label">Bitiş Tarihi</label>
+          <input type="date" id="bk-bitis" class="input" value="${book?.bitisTarihi || ''}">
+          <label class="field-label">Durum</label>
+          <select id="bk-durum" class="input">
+            ${Books.DURUMLAR.map((d) => `<option value="${d}" ${book?.durum === d ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
+          <label class="field-label">Öğrenci Özeti</label>
+          <textarea id="bk-ozet" class="input" rows="2">${Utils.escapeHtml(book?.ogrenciOzeti || '')}</textarea>
+          <label class="field-label">Öğretmen Değerlendirmesi</label>
+          <textarea id="bk-degerlendirme" class="input" rows="2">${Utils.escapeHtml(book?.ogretmenDegerlendirmesi || '')}</textarea>
+          <div id="bk-errors" class="form-errors"></div>
+        </div>
+        <div class="modal-actions">
+          ${book ? '<button class="btn btn-danger" id="bk-delete">Sil</button>' : ''}
+          <button class="btn btn-secondary" id="bk-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="bk-save">Kaydet</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#bk-cancel').onclick = () => Modal.close();
+          if (book) {
+            root.querySelector('#bk-delete').onclick = async () => {
+              const ok = await Confirm.ask('Bu kitap kaydı silinsin mi?', { danger: true });
+              if (!ok) return;
+              await Books.remove(book.id);
+              Modal.close();
+              renderList();
+            };
+          }
+          root.querySelector('#bk-save').onclick = async () => {
+            const form = {
+              kitapAdi: root.querySelector('#bk-ad').value,
+              yazar: root.querySelector('#bk-yazar').value,
+              sayfaSayisi: root.querySelector('#bk-sayfa').value,
+              baslangicTarihi: root.querySelector('#bk-baslangic').value,
+              bitisTarihi: root.querySelector('#bk-bitis').value,
+              durum: root.querySelector('#bk-durum').value,
+              ogrenciOzeti: root.querySelector('#bk-ozet').value,
+              ogretmenDegerlendirmesi: root.querySelector('#bk-degerlendirme').value,
+            };
+            const result = await Books.save(student.id, form, book?.id);
+            if (!result.ok) {
+              root.querySelector('#bk-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
+              return;
+            }
+            Modal.close();
+            Utils.toast('Kitap kaydedildi.', 'success');
+            renderList();
+          };
+        },
+      });
+    };
+
+    const renderList = () => {
+      const books = State.getStudentBooks(student.id);
+      if (!books.length) { listEl.innerHTML = emptyState('Henüz kitap eklenmedi.', '📚'); return; }
+      listEl.innerHTML = books.map((b) => `
+        <div class="list-item" data-id="${b.id}">
+          <div class="list-item-main">
+            <div class="list-item-title">${Utils.escapeHtml(b.kitapAdi)}</div>
+            <div class="list-item-sub">${Utils.escapeHtml(b.yazar || '-')} · ${b.durum}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm edit-book" data-id="${b.id}">Düzenle</button>
+        </div>
+      `).join('');
+      listEl.querySelectorAll('.edit-book').forEach((btn) => {
+        btn.onclick = () => openBookForm(books.find((b) => b.id === btn.dataset.id));
+      });
+    };
+
+    document.getElementById('add-book').onclick = () => openBookForm(null);
+    renderList();
+  },
+};
+
+// ---- Deneme Sonuçları ----
+const renderDenemeTab = {
+  html(student) {
+    return `
+      <button class="btn btn-secondary btn-block" id="add-exam">+ Deneme Sonucu Ekle</button>
+      <div class="card"><canvas id="exam-chart" height="180"></canvas></div>
+      <div class="list" id="exam-list"></div>
+    `;
+  },
+  mount(student) {
+    const listEl = document.getElementById('exam-list');
+    let chart = null;
+
+    const drawChart = () => {
+      const data = MockExams.chartData(student.id);
+      const ctx = document.getElementById('exam-chart');
+      if (chart) chart.destroy();
+      if (!data.labels.length) return;
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.labels,
+          datasets: [
+            { label: 'Puan', data: data.puanlar, borderColor: '#2563eb', backgroundColor: 'transparent', tension: 0.3, spanGaps: true },
+            { label: 'Net', data: data.netler, borderColor: '#16a34a', backgroundColor: 'transparent', tension: 0.3, spanGaps: true },
+          ],
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+      });
+    };
+
+    const openExamForm = (exam) => {
+      Modal.open(`
+        <div class="modal-header">${exam ? 'Deneme Düzenle' : 'Yeni Deneme'}</div>
+        <div class="modal-body">
+          <label class="field-label">Deneme Adı *</label>
+          <input type="text" id="ex-ad" class="input" value="${Utils.escapeHtml(exam?.denemeAdi || '')}">
+          <label class="field-label">Tarih *</label>
+          <input type="date" id="ex-tarih" class="input" value="${exam?.tarih || Utils.todayISO()}">
+          <label class="field-label">Puan</label>
+          <input type="number" step="0.01" id="ex-puan" class="input" value="${exam?.puan ?? ''}">
+          <div class="field-row-3">
+            <div><label class="field-label">Doğru</label><input type="number" id="ex-dogru" class="input" value="${exam?.dogru ?? ''}"></div>
+            <div><label class="field-label">Yanlış</label><input type="number" id="ex-yanlis" class="input" value="${exam?.yanlis ?? ''}"></div>
+            <div><label class="field-label">Boş</label><input type="number" id="ex-bos" class="input" value="${exam?.bos ?? ''}"></div>
+          </div>
+          <label class="field-label">Net</label>
+          <input type="number" step="0.01" id="ex-net" class="input" value="${exam?.net ?? ''}">
+          <div id="ex-errors" class="form-errors"></div>
+        </div>
+        <div class="modal-actions">
+          ${exam ? '<button class="btn btn-danger" id="ex-delete">Sil</button>' : ''}
+          <button class="btn btn-secondary" id="ex-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="ex-save">Kaydet</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#ex-cancel').onclick = () => Modal.close();
+          if (exam) {
+            root.querySelector('#ex-delete').onclick = async () => {
+              const ok = await Confirm.ask('Bu deneme sonucu silinsin mi?', { danger: true });
+              if (!ok) return;
+              await MockExams.remove(exam.id);
+              Modal.close();
+              renderAll();
+            };
+          }
+          root.querySelector('#ex-save').onclick = async () => {
+            const form = {
+              denemeAdi: root.querySelector('#ex-ad').value,
+              tarih: root.querySelector('#ex-tarih').value,
+              puan: root.querySelector('#ex-puan').value,
+              dogru: root.querySelector('#ex-dogru').value,
+              yanlis: root.querySelector('#ex-yanlis').value,
+              bos: root.querySelector('#ex-bos').value,
+              net: root.querySelector('#ex-net').value,
+            };
+            const result = await MockExams.save(student.id, form, exam?.id);
+            if (!result.ok) {
+              root.querySelector('#ex-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
+              return;
+            }
+            Modal.close();
+            Utils.toast('Deneme kaydedildi.', 'success');
+            renderAll();
+          };
+        },
+      });
+    };
+
+    const renderAll = () => {
+      const exams = State.getStudentMockExams(student.id);
+      if (!exams.length) { listEl.innerHTML = emptyState('Henüz deneme sonucu eklenmedi.', '📊'); }
+      else {
+        listEl.innerHTML = exams.slice().reverse().map((m) => `
+          <div class="list-item" data-id="${m.id}">
+            <div class="list-item-main">
+              <div class="list-item-title">${Utils.escapeHtml(m.denemeAdi)}</div>
+              <div class="list-item-sub">${Utils.formatDateTR(m.tarih)} · Puan: ${m.puan ?? '-'} · Net: ${m.net ?? '-'}</div>
+            </div>
+            <button class="btn btn-secondary btn-sm edit-exam" data-id="${m.id}">Düzenle</button>
+          </div>
+        `).join('');
+        listEl.querySelectorAll('.edit-exam').forEach((btn) => {
+          btn.onclick = () => openExamForm(exams.find((m) => m.id === btn.dataset.id));
+        });
+      }
+      drawChart();
+    };
+
+    document.getElementById('add-exam').onclick = () => openExamForm(null);
+    renderAll();
+  },
+};
+
+// ---- Gelişim Geçmişi ----
+const renderGelisimTab = {
+  html(student) {
+    const terms = State.getTermsSorted();
+    const sinifGecmisi = student.sinifGecmisi || [];
+    const hw = State.getStudentHomework(student.id);
+    const tamamlanan = hw.filter((a) => a.durum === 'teslim edildi').length;
+
+    return `
+      <div class="card">
+        <div class="card-title">Dönem Ortalamaları</div>
+        <div class="list">
+          ${terms.map((t) => {
+            const ort = Assessments.calcTermAverage(student.id, t.id);
+            return `<div class="kv-row"><span>${Utils.escapeHtml(t.ad)}</span><strong>${ort !== null ? ort : '-'}</strong></div>`;
+          }).join('')}
+          <div class="kv-row"><span>Genel Ortalama</span><strong>${Assessments.calcOverallAverage(student.id) ?? '-'}</strong></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Ödev Tamamlama</div>
+        <p class="muted">${hw.length ? `${tamamlanan} / ${hw.length} ödev teslim edildi.` : 'Ödev kaydı yok.'}</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Sınıf Geçmişi</div>
+        ${sinifGecmisi.length ? `
+          <ul class="simple-list">
+            ${sinifGecmisi.map((g) => `<li>${Utils.escapeHtml(g.sinif)} — ${Utils.formatDateTR(g.tarih)}</li>`).join('')}
+          </ul>
+        ` : '<p class="muted">Kayıt yok.</p>'}
+      </div>
+    `;
+  },
+  mount() {},
+};
