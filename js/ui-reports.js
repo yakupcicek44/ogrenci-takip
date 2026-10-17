@@ -50,6 +50,13 @@ const ReportsView = {
         <select id="report-term" class="input">
           ${terms.map((t) => `<option value="${t.id}">${Utils.escapeHtml(t.ad)}</option>`).join('')}
         </select>
+        <label class="field-label">Dahil Edilecek Bölümler</label>
+        <div class="checkbox-list">
+          <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="grades" checked> Notlar</label>
+          <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="ranking" checked> Sıralama</label>
+          <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="attendance"> Devamsızlık %</label>
+          <label class="checkbox-row"><input type="checkbox" class="class-section-check" value="homework"> Ödev Tamamlama</label>
+        </div>
         <div class="button-row">
           <button class="btn btn-primary" id="report-sinif-pdf">PDF İndir</button>
           <button class="btn btn-secondary" id="report-sinif-excel">Excel İndir</button>
@@ -121,17 +128,23 @@ const ReportsView = {
       }
     });
 
+    const getSelectedClassSections = () => {
+      const sections = {};
+      document.querySelectorAll('.class-section-check').forEach((cb) => { sections[cb.value] = cb.checked; });
+      return sections;
+    };
+
     document.getElementById('report-sinif-pdf')?.addEventListener('click', () => {
       const sinif = document.getElementById('report-sinif').value;
       const termId = document.getElementById('report-term').value;
       if (!sinif || !termId) return;
-      Reports.classPDF(sinif, termId);
+      Reports.classPDF(sinif, termId, getSelectedClassSections());
     });
     document.getElementById('report-sinif-excel')?.addEventListener('click', () => {
       const sinif = document.getElementById('report-sinif').value;
       const termId = document.getElementById('report-term').value;
       if (!sinif || !termId) return;
-      Reports.classExcel(sinif, termId);
+      Reports.classExcel(sinif, termId, getSelectedClassSections());
     });
   },
 };

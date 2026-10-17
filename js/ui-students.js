@@ -276,7 +276,7 @@ const renderGenelTab = {
           <label class="field-label">Beceri/Yetkinlik Etiketi (opsiyonel)</label>
           <input type="text" id="obs-beceri" class="input" value="${Utils.escapeHtml(obs?.beceriEtiketi || '')}" placeholder="Örn: Eleştirel Düşünme">
           <div class="checkbox-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;">
-            ${Observations.BECERI_ONERILERI.map((b) => `<span class="badge obs-chip" data-val="${Utils.escapeHtml(b)}" style="cursor:pointer;">${b}</span>`).join('')}
+            ${Observations.getBeceriEtiketleri().map((b) => `<span class="badge obs-chip" data-val="${Utils.escapeHtml(b)}" style="cursor:pointer;">${Utils.escapeHtml(b)}</span>`).join('')}
           </div>
           <div id="obs-errors" class="form-errors"></div>
         </div>

@@ -1,5 +1,11 @@
 // PDF (jsPDF) ve Excel (SheetJS) rapor üretimi — tamamen yerelde çalışır, harici servis kullanmaz
 const Reports = {
+  // Dosya adlarında "/" vb. karakterler (örn. "9/A" sınıf adı) bazı tarayıcı/işletim
+  // sistemlerinde alt klasör gibi yorumlanabiliyor veya reddediliyor — temizliyoruz.
+  _safeFilePart(s) {
+    return String(s || '').trim().replace(/\s+/g, '_').replace(/[\\/:*?"<>|]/g, '-');
+  },
+
   _newDoc() {
     const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
     doc.setFont('Lato', 'normal');
@@ -167,36 +173,62 @@ const Reports = {
       }
     }
 
-    doc.save(`${student.ad.replace(/\s+/g, '_')}_rapor.pdf`);
+    doc.save(`${this._safeFilePart(student.ad)}_rapor.pdf`);
   },
 
-  classPDF(sinif, termId) {
+  DEFAULT_CLASS_SECTIONS: { grades: true, ranking: true, attendance: false, homework: false },
+
+  _classTableSpec(sinif, termId, sections) {
+    const opt = { ...this.DEFAULT_CLASS_SECTIONS, ...(sections || {}) };
+    const ranking = Assessments.rankInClass(sinif, termId);
+    const head = ['Ad Soyad', 'Okul No'];
+    if (opt.grades) head.push('1.Sınav', '2.Sınav', '1.Perf.', '2.Perf.', 'Ortalama');
+    if (opt.ranking) head.push('Sıra');
+    if (opt.attendance) head.push('Devamsızlık %');
+    if (opt.homework) head.push('Ödev Tamamlama');
+
+    const rows = ranking.map((r) => {
+      const row = [r.student.ad, r.student.okulNo];
+      if (opt.grades) {
+        row.push(
+          ...Assessments.SLOTS.map((s) => {
+            const rec = Assessments.getSlotRecord(r.student.id, termId, s.key);
+            return rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '-';
+          }),
+          r.average !== null ? r.average : '-'
+        );
+      }
+      if (opt.ranking) row.push(r.rank);
+      if (opt.attendance) {
+        const att = Attendance.getStudentSummary(r.student.id);
+        row.push(att.toplam ? att.devamsizlikOrani : '-');
+      }
+      if (opt.homework) {
+        const hw = State.getStudentHomework(r.student.id);
+        const tamam = hw.filter((a) => a.durum === 'teslim edildi').length;
+        row.push(hw.length ? `${tamam}/${hw.length}` : '-');
+      }
+      return row;
+    });
+    return { head, rows };
+  },
+
+  classPDF(sinif, termId, sections) {
     const term = State.data.terms.find((t) => t.id === termId);
     const doc = this._newDoc();
     let y = this._header(doc, `Sınıf Raporu — ${sinif} (${term ? term.ad : ''})`);
-
-    const ranking = Assessments.rankInClass(sinif, termId);
-    const rows = ranking.map((r) => [
-      r.rank,
-      r.student.ad,
-      r.student.okulNo,
-      ...Assessments.SLOTS.map((s) => {
-        const rec = Assessments.getSlotRecord(r.student.id, termId, s.key);
-        return rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '-';
-      }),
-      r.average !== null ? r.average : '-',
-    ]);
+    const { head, rows } = this._classTableSpec(sinif, termId, sections);
 
     doc.autoTable({
       startY: y,
-      head: [['Sıra', 'Ad Soyad', 'Okul No', '1.Sınav', '2.Sınav', '1.Perf.', '2.Perf.', 'Ortalama']],
+      head: [head],
       body: rows,
       styles: { font: 'Lato', fontSize: 9 },
       headStyles: { font: 'Lato', fontStyle: 'bold', fillColor: [37, 99, 235] },
       margin: { left: 40, right: 40 },
     });
 
-    doc.save(`${sinif.replace(/\s+/g, '_')}_sinif_raporu.pdf`);
+    doc.save(`${this._safeFilePart(sinif)}_sinif_raporu.pdf`);
   },
 
   studentExcel(studentId, sections) {
@@ -265,28 +297,19 @@ const Reports = {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(examRows), 'Denemeler');
     }
 
-    XLSX.writeFile(wb, `${student.ad.replace(/\s+/g, '_')}_rapor.xlsx`);
+    XLSX.writeFile(wb, `${this._safeFilePart(student.ad)}_rapor.xlsx`);
   },
 
-  classExcel(sinif, termId) {
+  classExcel(sinif, termId, sections) {
     const term = State.data.terms.find((t) => t.id === termId);
-    const ranking = Assessments.rankInClass(sinif, termId);
-    const rows = [['Sıra', 'Ad Soyad', 'Okul No', '1.Sınav', '2.Sınav', '1.Performans', '2.Performans', 'Ortalama']];
-    for (const r of ranking) {
-      rows.push([
-        r.rank,
-        r.student.ad,
-        r.student.okulNo,
-        ...Assessments.SLOTS.map((s) => {
-          const rec = Assessments.getSlotRecord(r.student.id, termId, s.key);
-          return rec ? rec.puan : null;
-        }),
-        r.average,
-      ]);
-    }
+    const { head, rows: bodyRows } = this._classTableSpec(sinif, termId, sections);
+    const rows = [head, ...bodyRows];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), sinif.slice(0, 28));
-    XLSX.writeFile(wb, `${sinif.replace(/\s+/g, '_')}_${term ? term.ad : ''}_raporu.xlsx`);
+    // Excel sayfa adlarında : \ / ? * [ ] YASAK — Türkiye'de sınıf adları genelde
+    // "9/A" gibi "/" içerdiği için bunu temizlemezsek rapor her zaman çöküyordu.
+    const safeSheetName = sinif.replace(/[:\\/?*[\]]/g, '-').slice(0, 31) || 'Sınıf';
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), safeSheetName);
+    XLSX.writeFile(wb, `${this._safeFilePart(sinif)}_${this._safeFilePart(term ? term.ad : '')}_raporu.xlsx`);
   },
 
   // Dönem sonu KARNE — ham veri dökümü değil, veliye/okula verilebilecek tek, resmi
@@ -393,6 +416,6 @@ const Reports = {
     doc.text('Öğretmen İmzası: _______________________', 40, y + 20);
     doc.setTextColor(0);
 
-    doc.save(`${student.ad.replace(/\s+/g, '_')}_karne_${term.ad.replace(/\s+/g, '_')}.pdf`);
+    doc.save(`${this._safeFilePart(student.ad)}_karne_${this._safeFilePart(term.ad)}.pdf`);
   },
 };

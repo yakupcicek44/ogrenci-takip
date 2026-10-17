@@ -9,11 +9,17 @@ const OBSERVATION_TYPES = [
 
 // Serbest etiketler — resmi "yetkinlik alanı" sayısı/isimleri kaynaklar arası farklılaştığı için
 // sabit/resmi bir liste olarak sunulmuyor, sadece öneri niteliğinde kısayollar.
-const BECERI_ONERILERI = ['Eleştirel Düşünme', 'İletişim', 'Problem Çözme', 'Sorumluluk', 'İş Birliği', 'Araştırma'];
+// Ayarlar'dan düzenlenebilir (settings.beceriEtiketleri) — bu, değiştirilmemişse kullanılan varsayılandır.
+const DEFAULT_BECERI_ONERILERI = ['Eleştirel Düşünme', 'İletişim', 'Problem Çözme', 'Sorumluluk', 'İş Birliği', 'Araştırma'];
 
 const Observations = {
   TYPES: OBSERVATION_TYPES,
-  BECERI_ONERILERI,
+  DEFAULT_BECERI_ONERILERI,
+
+  getBeceriEtiketleri() {
+    const custom = State.data.settings.beceriEtiketleri;
+    return Array.isArray(custom) && custom.length ? custom : DEFAULT_BECERI_ONERILERI;
+  },
 
   async save(studentId, form, existingId) {
     if (!form.metin || !form.metin.trim()) return { ok: false, errors: ['Gözlem metni boş olamaz.'] };
