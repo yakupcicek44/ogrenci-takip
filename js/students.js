@@ -22,7 +22,6 @@ const Students = {
       okulNo: String(form.okulNo).trim(),
       sinif: form.sinif.trim(),
       aciklama: form.aciklama || '',
-      gozlemNotlari: form.gozlemNotlari || '',
       durum: 'aktif',
       sinifGecmisi: [{ sinif: form.sinif.trim(), tarih: now }],
       olusturmaTarihi: now,
@@ -47,7 +46,6 @@ const Students = {
       okulNo: String(form.okulNo).trim(),
       sinif: yeniSinif,
       aciklama: form.aciklama || '',
-      gozlemNotlari: form.gozlemNotlari || '',
     };
 
     if (sinifDegisti) {
@@ -133,6 +131,15 @@ const Students = {
       const result = await this.create(form);
       if (result.ok) {
         eklenen++;
+        // Excel'deki "Gözlem Notu" sütunu artık tek metin alanı değil, tarihli
+        // Gözlem Günlüğü'nün ilk kaydı olarak taşınıyor (veri görünmez olmasın).
+        if (form.gozlemNotlari && form.gozlemNotlari.trim()) {
+          await Observations.save(result.student.id, {
+            tur: 'gozlem',
+            tarih: Utils.todayISO(),
+            metin: form.gozlemNotlari.trim(),
+          });
+        }
       } else {
         atlananlar.push({ satir: satirNo, sebep: result.errors.join(' ') });
       }
@@ -144,8 +151,10 @@ const Students = {
     let list = State.data.students;
     if (sinifFilter) list = list.filter((s) => s.sinif === sinifFilter);
     if (query && query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter((s) => s.ad.toLowerCase().includes(q) || String(s.okulNo).includes(q));
+      // Türkçe büyük/küçük harf kuralı (İ/i, I/ı) düz toLowerCase()'de bozuluyor —
+      // "Işık" aranırken "ışık" yazılması gibi durumlar eşleşmeyebiliyordu.
+      const q = query.trim().toLocaleLowerCase('tr');
+      list = list.filter((s) => s.ad.toLocaleLowerCase('tr').includes(q) || String(s.okulNo).includes(q));
     }
     return [...list].sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
   },

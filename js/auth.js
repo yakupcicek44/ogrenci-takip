@@ -34,7 +34,7 @@ const Auth = {
   async verify(username, password) {
     const auth = State.data.settings.auth;
     if (!auth) return false;
-    if (username.trim().toLowerCase() !== auth.username.toLowerCase()) return false;
+    if (username.trim().toLocaleLowerCase('tr') !== auth.username.toLocaleLowerCase('tr')) return false;
     const hashHex = await this._hash(password, auth.saltHex);
     return hashHex === auth.hashHex;
   },

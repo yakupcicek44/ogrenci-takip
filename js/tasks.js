@@ -80,10 +80,6 @@ const Tasks = {
     return task.durum !== 'tamamlandi' && task.sonTarih && task.sonTarih < Utils.todayISO();
   },
 
-  isToday(task) {
-    return task.sonTarih === Utils.todayISO();
-  },
-
   // Dashboard için: bugün ve geçmiş (tamamlanmamış) görevler, önceliğe göre sıralı
   getDashboardTasks() {
     const oncelikSira = { yuksek: 0, normal: 1, dusuk: 2 };

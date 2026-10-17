@@ -93,9 +93,11 @@ const HomeworkView = {
       const a = State.data.homeworkAssignments.find((x) => x.id === assignmentId);
       const task = State.getHomeworkTask(a.homeworkId);
       const student = State.getStudent(a.studentId);
+      const stats = task ? Homework.getTaskStats(task.id) : null;
       Modal.open(`
         <div class="modal-header">${Utils.escapeHtml(task?.ad || '')} — ${Utils.escapeHtml(student?.ad || '')}</div>
         <div class="modal-body">
+          ${stats ? `<p class="muted small">Bu ödev toplam ${stats.toplam} öğrenciye atandı — ${stats['teslim edildi'] || 0} teslim etti, ${stats['eksik'] || 0} eksik, ${stats['bekliyor'] || 0} bekliyor.</p>` : ''}
           <label class="field-label">Durum</label>
           <select id="ehw-durum" class="input">
             ${Homework.DURUMLAR.map((d) => `<option value="${d}" ${d === a.durum ? 'selected' : ''}>${d}</option>`).join('')}
@@ -105,6 +107,7 @@ const HomeworkView = {
           <label class="field-label">Öğretmen Notu</label>
           <textarea id="ehw-not" class="input" rows="2">${Utils.escapeHtml(a.ogretmenNotu || '')}</textarea>
           <button class="btn btn-secondary btn-block" id="ehw-scan" style="margin-top:10px;">📷 Ödevi Tara ve AI ile Değerlendir</button>
+          <button class="btn btn-danger btn-block" id="ehw-delete-task" style="margin-top:10px;">Bu Ödevi Tüm Öğrencilerden Sil</button>
         </div>
         <div class="modal-actions">
           <button class="btn btn-secondary" id="ehw-cancel">Vazgeç</button>
@@ -113,6 +116,17 @@ const HomeworkView = {
       `, {
         onMount: (root) => {
           root.querySelector('#ehw-cancel').onclick = () => Modal.close();
+          root.querySelector('#ehw-delete-task').onclick = async () => {
+            const ok = await Confirm.ask(
+              `"${task?.ad || ''}" ödevi ${stats?.toplam || 0} öğrencinin kaydından TAMAMEN silinecek. Bu işlem geri alınamaz. Onaylıyor musun?`,
+              { danger: true, confirmText: 'Evet, Sil' }
+            );
+            if (!ok) return;
+            await Homework.deleteTask(task.id);
+            Modal.close();
+            Utils.toast('Ödev silindi.', 'success');
+            renderAssignmentList();
+          };
           root.querySelector('#ehw-scan').onclick = () => {
             ScanFlow.start({
               studentId: a.studentId,

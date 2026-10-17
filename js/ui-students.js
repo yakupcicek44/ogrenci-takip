@@ -821,6 +821,28 @@ const renderGelisimTab = {
           </ul>
         ` : '<p class="muted">Kayıt yok.</p>'}
       </div>
+
+      ${(() => {
+        const scans = State.getStudentScans(student.id);
+        if (!scans.length) return '';
+        return `
+          <div class="card">
+            <div class="card-title">AI Tarama Geçmişi</div>
+            <div class="list">
+              ${scans.map((s) => `
+                <div class="list-item" data-id="${s.id}" style="align-items:flex-start;">
+                  <img src="${s.imageDataUrl}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;">
+                  <div class="list-item-main">
+                    <div class="list-item-title">${Utils.formatDateTimeTR(s.olusturmaTarihi)} · <span class="badge badge-${s.durum === 'onaylandi' ? 'teslim-edildi' : s.durum === 'reddedildi' ? 'eksik' : 'bekliyor'}">${s.durum}</span></div>
+                    <div class="list-item-sub">${Utils.escapeHtml(s.context || '')}${s.aiOnerilenPuan !== null && s.aiOnerilenPuan !== undefined ? ' · Puan: ' + s.aiOnerilenPuan : ''}</div>
+                    <div class="list-item-sub">${Utils.escapeHtml(s.aiMetin || '')}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      })()}
     `;
   },
   mount() {},
