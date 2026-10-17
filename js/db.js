@@ -1,6 +1,6 @@
 // IndexedDB katmanı — tüm kalıcı veri burada tutulur (geçici bellek kullanılmaz)
 const DB_NAME = 'ogrenci-takip-db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbInstance = null;
 
@@ -78,6 +78,12 @@ function openDB() {
       if (!db.objectStoreNames.contains('notes')) {
         const n = db.createObjectStore('notes', { keyPath: 'id' });
         n.createIndex('studentId', 'studentId', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('attendance')) {
+        const at = db.createObjectStore('attendance', { keyPath: 'id' });
+        at.createIndex('studentId', 'studentId', { unique: false });
+        at.createIndex('tarih', 'tarih', { unique: false });
       }
 
       // v2 -> v3: eski tek metinlik "gozlemNotlari" alanını kaybetmemek için
@@ -184,7 +190,7 @@ const DB = {
 
   // Tüm store'ları tek bir nesnede döndürür (JSON yedekleme için)
   async exportAll() {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'settings'];
     const result = {};
     for (const n of names) {
       result[n] = await DB.getAll(n);
@@ -194,7 +200,7 @@ const DB = {
 
   // JSON yedekten tüm store'ları geri yükler (önce temizler, sonra yazar)
   async importAll(data) {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'settings'];
     for (const n of names) {
       await DB.clear(n);
       if (Array.isArray(data[n]) && data[n].length) {

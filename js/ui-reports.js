@@ -18,6 +18,22 @@ const ReportsView = {
       </div>
 
       <div class="card">
+        <div class="card-title">Dönem Sonu Karne</div>
+        <p class="muted small">Notlar, devamsızlık, ödev ve gözlem günlüğünü tek, resmi görünümlü bir PDF'te birleştirir.</p>
+        <select id="karne-student" class="input">
+          ${students.map((s) => `<option value="${s.id}">${Utils.escapeHtml(s.ad)} (${Utils.escapeHtml(s.sinif)})</option>`).join('')}
+        </select>
+        <select id="karne-term" class="input" style="margin-top:8px;">
+          ${terms.map((t) => `<option value="${t.id}">${Utils.escapeHtml(t.ad)}${!t.baslangicTarihi ? ' (tarih aralığı girilmedi)' : ''}</option>`).join('')}
+        </select>
+        <div class="button-row">
+          <button class="btn btn-secondary" id="karne-ai-metin">AI ile Değerlendirme Taslağı Oluştur</button>
+        </div>
+        <button class="btn btn-primary btn-block" id="karne-pdf" style="margin-top:10px;">Karne İndir (PDF)</button>
+        <div id="karne-status" class="muted small" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Sınıf Bazlı Rapor</div>
         <select id="report-sinif" class="input">
           ${siniflar.map((s) => `<option value="${Utils.escapeHtml(s)}">${Utils.escapeHtml(s)}</option>`).join('')}
@@ -48,6 +64,48 @@ const ReportsView = {
       if (!id) return;
       Reports.studentExcel(id);
     });
+    document.getElementById('karne-pdf')?.addEventListener('click', () => {
+      const studentId = document.getElementById('karne-student').value;
+      const termId = document.getElementById('karne-term').value;
+      if (!studentId || !termId) return;
+      Reports.karnePDF(studentId, termId);
+    });
+
+    document.getElementById('karne-ai-metin')?.addEventListener('click', async () => {
+      const studentId = document.getElementById('karne-student').value;
+      const termId = document.getElementById('karne-term').value;
+      if (!studentId || !termId) return;
+      const statusEl = document.getElementById('karne-status');
+      statusEl.textContent = 'Taslak oluşturuluyor… (internet gerekir)';
+      try {
+        const metin = await Narrative.generate(studentId, termId);
+        statusEl.textContent = '';
+        Modal.open(`
+          <div class="modal-header">AI Değerlendirme Taslağı (Onaysız)</div>
+          <div class="modal-body">
+            <p class="muted small">Bu bir öneridir — gözden geçirip düzenledikten sonra onayla. Onaylarsan Gözlem Günlüğü'ne "Öğretmen Değerlendirmesi" olarak kaydedilir ve Karne'de otomatik görünür.</p>
+            <textarea id="narr-metin" class="input" rows="6">${Utils.escapeHtml(metin)}</textarea>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" id="narr-reject">Vazgeç</button>
+            <button class="btn btn-primary" id="narr-approve">Onayla ve Kaydet</button>
+          </div>
+        `, {
+          onMount: (root) => {
+            root.querySelector('#narr-reject').onclick = () => Modal.close();
+            root.querySelector('#narr-approve').onclick = async () => {
+              await Narrative.approve(studentId, termId, root.querySelector('#narr-metin').value);
+              Modal.close();
+              Utils.toast('Değerlendirme kaydedildi.', 'success');
+            };
+          },
+        });
+      } catch (e) {
+        statusEl.textContent = '';
+        Utils.toast('Taslak oluşturulamadı: ' + e.message, 'error');
+      }
+    });
+
     document.getElementById('report-sinif-pdf')?.addEventListener('click', () => {
       const sinif = document.getElementById('report-sinif').value;
       const termId = document.getElementById('report-term').value;

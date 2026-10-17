@@ -61,7 +61,7 @@ const Auth = {
   // Şifre unutulduğunda: kurtarma yöntemi yoktur (backend yok). Tüm veriyi ve
   // kilidi sıfırlar — kullanıcı daha sonra bir JSON yedekten geri yükleyebilir.
   async resetEverything() {
-    for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'settings']) {
+    for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'settings']) {
       await DB.clear(store);
     }
     await State.init();

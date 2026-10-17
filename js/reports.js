@@ -244,4 +244,111 @@ const Reports = {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), sinif.slice(0, 28));
     XLSX.writeFile(wb, `${sinif.replace(/\s+/g, '_')}_${term ? term.ad : ''}_raporu.xlsx`);
   },
+
+  // Dönem sonu KARNE — ham veri dökümü değil, veliye/okula verilebilecek tek, resmi
+  // görünümlü bir özet. Dönemin başlangıç/bitiş tarihi Ayarlar'dan girildiyse devamsızlık,
+  // ödev ve gözlem kayıtları SADECE o aralığa göre süzülür; girilmediyse tüm zamanlar kullanılır
+  // (bu durum raporda açıkça belirtilir, sessizce yanlış sayı göstermez).
+  karnePDF(studentId, termId) {
+    const student = State.getStudent(studentId);
+    const term = State.data.terms.find((t) => t.id === termId);
+    if (!student || !term) return;
+
+    const range = { baslangic: term.baslangicTarihi, bitis: term.bitisTarihi };
+    const araligBelirsiz = !term.baslangicTarihi && !term.bitisTarihi;
+
+    const doc = this._newDoc();
+    doc.setFont('Lato', 'bold');
+    doc.setFontSize(20);
+    doc.text('KARNE', 40, 44);
+    doc.setFont('Lato', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text('Oluşturulma: ' + Utils.formatDateTimeTR(new Date().toISOString()), 40, 60);
+    doc.setTextColor(0);
+    let y = 84;
+
+    doc.setFontSize(11);
+    doc.text(`${student.ad}   ·   Okul No: ${student.okulNo}   ·   Sınıf/Şube: ${student.sinif}`, 40, y);
+    y += 18;
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    const aralikMetni = araligBelirsiz
+      ? `${term.ad} (tarih aralığı girilmedi — tüm zamanlar)`
+      : `${term.ad} (${term.baslangicTarihi ? Utils.formatDateTR(term.baslangicTarihi) : '…'} – ${term.bitisTarihi ? Utils.formatDateTR(term.bitisTarihi) : '…'})`;
+    doc.text(aralikMetni, 40, y);
+    doc.setTextColor(0);
+    y += 24;
+
+    y = this._sectionTitle(doc, 'Sınav ve Performans Notları', y);
+    const notRows = Assessments.SLOTS.map((slotDef) => {
+      const rec = Assessments.getSlotRecord(studentId, termId, slotDef.key);
+      return [slotDef.etiket, rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '-'];
+    });
+    const ortalama = Assessments.calcTermAverage(studentId, termId);
+    const ranking = Assessments.rankInClass(student.sinif, termId);
+    const kendiSira = ranking.find((r) => r.student.id === studentId);
+    doc.autoTable({
+      startY: y,
+      head: [['Değerlendirme', 'Not']],
+      body: [...notRows, ['Dönem Ortalaması', ortalama !== null ? ortalama : '-'], ['Sınıf İçi Sıralama', kendiSira ? `${kendiSira.rank} / ${ranking.length}` : '-']],
+      styles: { font: 'Lato', fontSize: 9 },
+      headStyles: { font: 'Lato', fontStyle: 'bold', fillColor: [37, 99, 235] },
+      margin: { left: 40, right: 40 },
+    });
+    y = doc.lastAutoTable.finalY + 20;
+
+    const attSummary = Attendance.getStudentSummary(studentId, range);
+    y = this._sectionTitle(doc, 'Devamsızlık' + (araligBelirsiz ? ' (tüm zamanlar)' : ''), y);
+    doc.setFontSize(9);
+    doc.text(
+      attSummary.toplam
+        ? `Toplam ${attSummary.toplam} gün · Var: ${attSummary.var} · Yok: ${attSummary.yok} · İzinli: ${attSummary.izinli} · Devamsızlık oranı: %${attSummary.devamsizlikOrani}`
+        : 'Bu aralıkta yoklama kaydı yok.',
+      40, y
+    );
+    y += 22;
+
+    const hw = State.getStudentHomeworkInRange(studentId, range);
+    const hwTamamlanan = hw.filter((a) => a.durum === 'teslim edildi').length;
+    y = this._sectionTitle(doc, 'Ödev Tamamlama' + (araligBelirsiz ? ' (tüm zamanlar)' : ''), y);
+    doc.setFontSize(9);
+    doc.text(hw.length ? `${hwTamamlanan} / ${hw.length} ödev teslim edildi.` : 'Bu aralıkta ödev kaydı yok.', 40, y);
+    y += 22;
+
+    const obs = State.getStudentObservationsInRange(studentId, range);
+    const degerlendirme = obs.find((o) => o.tur === 'degerlendirme');
+    const digerGozlemler = obs.filter((o) => o.tur !== 'degerlendirme');
+
+    if (degerlendirme) {
+      if (y > 680) { doc.addPage(); y = 40; }
+      y = this._sectionTitle(doc, 'Öğretmen Değerlendirmesi', y);
+      doc.setFontSize(9);
+      const lines = doc.splitTextToSize(degerlendirme.metin, 515);
+      doc.text(lines, 40, y);
+      y += lines.length * 11 + 14;
+    }
+
+    if (digerGozlemler.length) {
+      if (y > 650) { doc.addPage(); y = 40; }
+      y = this._sectionTitle(doc, 'Gözlem Günlüğü' + (araligBelirsiz ? ' (tüm zamanlar)' : ''), y);
+      doc.autoTable({
+        startY: y,
+        head: [['Tarih', 'Tür', 'Metin']],
+        body: digerGozlemler.map((o) => [Utils.formatDateTR(o.tarih), Observations.TYPES.find((t) => t.key === o.tur)?.etiket || o.tur, o.metin]),
+        styles: { font: 'Lato', fontSize: 9 },
+        headStyles: { font: 'Lato', fontStyle: 'bold', fillColor: [37, 99, 235] },
+        margin: { left: 40, right: 40 },
+      });
+      y = doc.lastAutoTable.finalY + 30;
+    }
+
+    if (y > 700) { doc.addPage(); y = 40; }
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text('Öğretmen İmzası: _______________________', 40, y + 20);
+    doc.setTextColor(0);
+
+    doc.save(`${student.ad.replace(/\s+/g, '_')}_karne_${term.ad.replace(/\s+/g, '_')}.pdf`);
+  },
 };

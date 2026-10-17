@@ -134,6 +134,10 @@ const SettingsView = {
         <div class="modal-body">
           <label class="field-label">Dönem Adı *</label>
           <input type="text" id="term-ad" class="input" value="${Utils.escapeHtml(term?.ad || '')}">
+          <label class="field-label">Başlangıç Tarihi (opsiyonel — karne/devamsızlık bu aralığa göre hesaplanır)</label>
+          <input type="date" id="term-baslangic" class="input" value="${term?.baslangicTarihi || ''}">
+          <label class="field-label">Bitiş Tarihi (opsiyonel)</label>
+          <input type="date" id="term-bitis" class="input" value="${term?.bitisTarihi || ''}">
         </div>
         <div class="modal-actions">
           ${term ? '<button class="btn btn-danger" id="term-delete">Sil</button>' : ''}
@@ -157,8 +161,12 @@ const SettingsView = {
           root.querySelector('#term-save').onclick = async () => {
             const ad = root.querySelector('#term-ad').value.trim();
             if (!ad) return;
+            const baslangicTarihi = root.querySelector('#term-baslangic').value || null;
+            const bitisTarihi = root.querySelector('#term-bitis').value || null;
             const terms = State.getTermsSorted();
-            const record = term ? { ...term, ad } : { id: Utils.uid(), ad, sira: terms.length + 1 };
+            const record = term
+              ? { ...term, ad, baslangicTarihi, bitisTarihi }
+              : { id: Utils.uid(), ad, sira: terms.length + 1, baslangicTarihi, bitisTarihi };
             await State.save('terms', record);
             Modal.close();
             Router.render();
@@ -284,7 +292,7 @@ const SettingsView = {
       if (!ok1) return;
       const ok2 = await Confirm.ask('Bu işlem GERİ ALINAMAZ. Gerçekten tüm verileri silmek istiyor musun?', { danger: true, confirmText: 'Evet, Sil' });
       if (!ok2) return;
-      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes']) {
+      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance']) {
         await DB.clear(store);
       }
       await State.init();

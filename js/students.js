@@ -75,6 +75,7 @@ const Students = {
       ['tasks', State.data.tasks.filter((t) => t.studentId === id)],
       ['reminders', State.data.reminders.filter((r) => r.studentId === id)],
       ['notes', State.data.notes.filter((n) => n.studentId === id)],
+      ['attendance', State.data.attendance.filter((a) => a.studentId === id)],
     ];
     for (const [store, rows] of related) {
       for (const row of rows) {

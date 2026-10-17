@@ -4,6 +4,7 @@
 const OBSERVATION_TYPES = [
   { key: 'onDegerlendirme', etiket: 'Ön Değerlendirme' },
   { key: 'gozlem', etiket: 'Gözlem' },
+  { key: 'degerlendirme', etiket: 'Öğretmen Değerlendirmesi' },
 ];
 
 // Serbest etiketler — resmi "yetkinlik alanı" sayısı/isimleri kaynaklar arası farklılaştığı için

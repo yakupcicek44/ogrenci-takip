@@ -41,6 +41,7 @@ const NAV_ITEMS = [
   { route: '#/', label: 'Ana Sayfa', icon: '🏠' },
   { route: '#/ogrenciler', label: 'Öğrenciler', icon: '🧑‍🎓' },
   { route: '#/odev-atama', label: 'Ödevler', icon: '📝' },
+  { route: '#/yoklama', label: 'Yoklama', icon: '🗓️' },
   { route: '#/asistan', label: 'Asistan', icon: '✅' },
   { route: '#/raporlar', label: 'Raporlar', icon: '📄' },
   { route: '#/ayarlar', label: 'Ayarlar', icon: '⚙️' },

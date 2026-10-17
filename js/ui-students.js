@@ -166,6 +166,7 @@ const STUDENT_TABS = [
   { key: 'odev', label: 'Ödev Takibi' },
   { key: 'kitap', label: 'Kitap Okuma' },
   { key: 'deneme', label: 'Deneme Sonuçları' },
+  { key: 'yoklama', label: 'Yoklama' },
   { key: 'gelisim', label: 'Gelişim Geçmişi' },
 ];
 
@@ -196,6 +197,7 @@ const StudentDetailView = {
       odev: renderOdevTab,
       kitap: renderKitapTab,
       deneme: renderDenemeTab,
+      yoklama: renderYoklamaTab,
       gelisim: renderGelisimTab,
     };
     const renderer = renderers[tab] || renderGenelTab;
@@ -789,6 +791,82 @@ const renderDenemeTab = {
 };
 
 // ---- Gelişim Geçmişi ----
+// ---- Yoklama (öğrenci bazlı geçmiş + tekil düzeltme) ----
+const renderYoklamaTab = {
+  html(student) {
+    const summary = Attendance.getStudentSummary(student.id);
+    return `
+      <div class="card">
+        <div class="card-title">Devamsızlık Özeti (tüm zamanlar)</div>
+        <div class="kv-row"><span>Toplam Kayıt</span><strong>${summary.toplam}</strong></div>
+        <div class="kv-row"><span>Var</span><strong>${summary.var}</strong></div>
+        <div class="kv-row"><span>Yok</span><strong>${summary.yok}</strong></div>
+        <div class="kv-row"><span>İzinli</span><strong>${summary.izinli}</strong></div>
+        <div class="kv-row"><span>Devamsızlık Oranı</span><strong>${summary.devamsizlikOrani !== null ? summary.devamsizlikOrani + '%' : '-'}</strong></div>
+        <p class="muted small" style="margin-top:8px;">Günlük toplu yoklama almak için alt menüden <a href="#/yoklama">Yoklama</a> sekmesini kullan.</p>
+      </div>
+      <button class="btn btn-secondary btn-block" id="add-single-attendance">+ Tekil Gün Düzelt/Ekle</button>
+      <div id="attendance-list" class="list" style="margin-top:10px;"></div>
+    `;
+  },
+  mount(student) {
+    const renderList = () => {
+      const list = State.getStudentAttendance(student.id);
+      const container = document.getElementById('attendance-list');
+      if (!list.length) { container.innerHTML = emptyState('Henüz yoklama kaydı yok.', '🗓️'); return; }
+      container.innerHTML = list.map((a) => `
+        <div class="list-item" data-id="${a.id}">
+          <div class="list-item-main">
+            <div class="list-item-title">${Utils.formatDateTR(a.tarih)}</div>
+            <div class="list-item-sub"><span class="badge badge-${a.durum === 'var' ? 'teslim-edildi' : a.durum === 'yok' ? 'eksik' : 'geç-teslim'}">${a.durum}</span></div>
+          </div>
+          <button class="btn btn-secondary btn-sm edit-attendance" data-tarih="${a.tarih}" data-durum="${a.durum}">Düzenle</button>
+        </div>
+      `).join('');
+      container.querySelectorAll('.edit-attendance').forEach((btn) => {
+        btn.onclick = () => openForm(btn.dataset.tarih, btn.dataset.durum);
+      });
+    };
+
+    const openForm = (tarih, durum) => {
+      Modal.open(`
+        <div class="modal-header">Yoklama Kaydı</div>
+        <div class="modal-body">
+          <label class="field-label">Tarih</label>
+          <input type="date" id="at-tarih" class="input" value="${tarih || Utils.todayISO()}">
+          <label class="field-label">Durum</label>
+          <select id="at-durum" class="input">
+            ${Attendance.DURUMLAR.map((d) => `<option value="${d}" ${d === durum ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-danger" id="at-delete">Sil</button>
+          <button class="btn btn-secondary" id="at-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="at-save">Kaydet</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#at-cancel').onclick = () => Modal.close();
+          root.querySelector('#at-delete').onclick = async () => {
+            await Attendance.unmark(student.id, root.querySelector('#at-tarih').value);
+            Modal.close();
+            renderList();
+          };
+          root.querySelector('#at-save').onclick = async () => {
+            await Attendance.mark(student.id, root.querySelector('#at-tarih').value, root.querySelector('#at-durum').value);
+            Modal.close();
+            Utils.toast('Yoklama kaydedildi.', 'success');
+            renderList();
+          };
+        },
+      });
+    };
+
+    document.getElementById('add-single-attendance').onclick = () => openForm(null, 'var');
+    renderList();
+  },
+};
+
 const renderGelisimTab = {
   html(student) {
     const terms = State.getTermsSorted();

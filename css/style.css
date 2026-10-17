@@ -387,18 +387,18 @@ textarea.input { resize: vertical; }
   justify-content: center;
   gap: 1px;
   padding: 6px 0;
-  margin: 2px;
+  margin: 1px;
   text-decoration: none;
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 600;
   border-radius: 12px;
   transition: background 0.15s, color 0.15s;
   min-width: 0;
 }
 .nav-item.active { color: var(--primary); font-weight: 750; background: var(--primary-light); }
-.nav-icon { font-size: 18px; line-height: 1; }
-.nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.nav-icon { font-size: 17px; line-height: 1; }
+.nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 0 1px; }
 
 /* Modal */
 @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }

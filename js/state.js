@@ -14,6 +14,7 @@ const State = {
     tasks: [],
     reminders: [],
     notes: [],
+    attendance: [],
     settings: null,
   },
 
@@ -33,6 +34,7 @@ const State = {
     d.tasks = await DB.getAll('tasks');
     d.reminders = await DB.getAll('reminders');
     d.notes = await DB.getAll('notes');
+    d.attendance = await DB.getAll('attendance');
     const settingsRows = await DB.getAll('settings');
     d.settings = settingsRows.find((s) => s.id === 'main') || null;
 
@@ -100,6 +102,16 @@ const State = {
     return this.data.homeworkAssignments.filter((a) => a.studentId === studentId);
   },
 
+  getStudentHomeworkInRange(studentId, { baslangic, bitis } = {}) {
+    return this.getStudentHomework(studentId).filter((a) => {
+      const task = this.getHomeworkTask(a.homeworkId);
+      if (!task) return false;
+      if (baslangic && task.verilisTarihi && task.verilisTarihi < baslangic) return false;
+      if (bitis && task.verilisTarihi && task.verilisTarihi > bitis) return false;
+      return true;
+    });
+  },
+
   getStudentBooks(studentId) {
     return this.data.books.filter((b) => b.studentId === studentId);
   },
@@ -118,6 +130,13 @@ const State = {
 
   getStudentObservations(studentId) {
     return this.data.observations.filter((o) => o.studentId === studentId).sort((a, b) => (b.tarih || '').localeCompare(a.tarih || ''));
+  },
+
+  getStudentObservationsInRange(studentId, { baslangic, bitis } = {}) {
+    let list = this.getStudentObservations(studentId);
+    if (baslangic) list = list.filter((o) => o.tarih >= baslangic);
+    if (bitis) list = list.filter((o) => o.tarih <= bitis);
+    return list;
   },
 
   getTask(id) {
@@ -146,6 +165,17 @@ const State = {
 
   getStudentNotes(studentId) {
     return this.data.notes.filter((n) => n.studentId === studentId).sort((a, b) => (b.guncellemeTarihi || '').localeCompare(a.guncellemeTarihi || ''));
+  },
+
+  getStudentAttendance(studentId) {
+    return this.data.attendance.filter((a) => a.studentId === studentId).sort((a, b) => (b.tarih || '').localeCompare(a.tarih || ''));
+  },
+
+  getAttendanceForDate(sinif, tarih) {
+    const ids = new Set(this.data.students.filter((s) => s.sinif === sinif).map((s) => s.id));
+    const map = {};
+    this.data.attendance.filter((a) => a.tarih === tarih && ids.has(a.studentId)).forEach((a) => { map[a.studentId] = a.durum; });
+    return map;
   },
 
   getHomeworkTask(id) {
