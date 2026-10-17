@@ -1,6 +1,6 @@
 // Service Worker — çevrimdışı çalışma için uygulama kabuğunu ve kütüphaneleri önbelleğe alır.
 // Veri (öğrenci kayıtları vb.) burada DEĞİL, cihazdaki IndexedDB'de tutulur.
-const CACHE_NAME = 'ogrenci-takip-v11';
+const CACHE_NAME = 'ogrenci-takip-v12';
 
 const PRECACHE_URLS = [
   './',
@@ -22,6 +22,7 @@ const PRECACHE_URLS = [
   './js/tasks.js',
   './js/reminders.js',
   './js/notes.js',
+  './js/documents.js',
   './js/attendance.js',
   './js/scan.js',
   './js/drive.js',

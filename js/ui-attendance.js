@@ -29,8 +29,11 @@ const AttendanceView = {
       const students = State.getActiveStudents().filter((s) => s.sinif === sinif).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
       if (!students.length) { container.innerHTML = emptyState('Bu sınıfta öğrenci yok.', '🗓️'); return; }
 
+      // Her öğrenci varsayılan olarak "var" işaretli gelir — öğretmen sadece
+      // devamsız olanları işaretlesin, herkesi tek tek "var" yapması gerekmesin.
       const existing = State.getAttendanceForDate(sinif, tarih);
-      pending = { ...existing };
+      pending = {};
+      students.forEach((s) => { pending[s.id] = existing[s.id] || 'var'; });
 
       container.innerHTML = students.map((s) => `
         <div class="list-item" data-student="${s.id}">

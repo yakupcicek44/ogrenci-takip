@@ -1,6 +1,6 @@
 // IndexedDB katmanı — tüm kalıcı veri burada tutulur (geçici bellek kullanılmaz)
 const DB_NAME = 'ogrenci-takip-db';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbInstance = null;
 
@@ -84,6 +84,14 @@ function openDB() {
         const at = db.createObjectStore('attendance', { keyPath: 'id' });
         at.createIndex('studentId', 'studentId', { unique: false });
         at.createIndex('tarih', 'tarih', { unique: false });
+      }
+
+      // Yıllık plan / toplantı tutanağı gibi PDF/Word dosyaları (öğrenciye bağlı değil,
+      // genel belge kütüphanesi). İçerik base64 dataUrl olarak saklanır — scans.imageDataUrl
+      // ile aynı desen, böylece JSON yedeğe de doğrudan dahil olur.
+      if (!db.objectStoreNames.contains('documents')) {
+        const doc = db.createObjectStore('documents', { keyPath: 'id' });
+        doc.createIndex('kategori', 'kategori', { unique: false });
       }
 
       // v2 -> v3: eski tek metinlik "gozlemNotlari" alanını kaybetmemek için
@@ -190,7 +198,7 @@ const DB = {
 
   // Tüm store'ları tek bir nesnede döndürür (JSON yedekleme için)
   async exportAll() {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'settings'];
     const result = {};
     for (const n of names) {
       result[n] = await DB.getAll(n);
@@ -200,7 +208,7 @@ const DB = {
 
   // JSON yedekten tüm store'ları geri yükler (önce temizler, sonra yazar)
   async importAll(data) {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'settings'];
     for (const n of names) {
       await DB.clear(n);
       if (Array.isArray(data[n]) && data[n].length) {

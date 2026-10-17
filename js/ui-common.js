@@ -35,6 +35,39 @@ const Confirm = {
       });
     });
   },
+
+  // İki aşamalı, yazarak onaylanan koruma — geri alınamaz işlemlerde (örn. öğrenci
+  // kaydını tamamen silme) tek tıkla yanlışlıkla onaylamayı engellemek için.
+  askTyped(message, matchText, { confirmText = 'Kalıcı Olarak Sil' } = {}) {
+    return new Promise((resolve) => {
+      Modal.open(`
+        <div class="modal-header">Son Onay</div>
+        <div class="modal-body">
+          <p>${Utils.escapeHtml(message)}</p>
+          <p class="muted small">Onaylamak için şunu tam olarak yaz: <strong>${Utils.escapeHtml(matchText)}</strong></p>
+          <input type="text" id="confirm-typed-input" class="input" autocomplete="off">
+          <div id="confirm-typed-error" class="form-errors"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="confirm-typed-cancel">Vazgeç</button>
+          <button class="btn btn-danger" id="confirm-typed-ok">${Utils.escapeHtml(confirmText)}</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#confirm-typed-cancel').onclick = () => { Modal.close(); resolve(false); };
+          root.querySelector('#confirm-typed-ok').onclick = () => {
+            const val = root.querySelector('#confirm-typed-input').value.trim();
+            if (val.toLocaleLowerCase('tr') !== matchText.trim().toLocaleLowerCase('tr')) {
+              root.querySelector('#confirm-typed-error').textContent = 'Yazdığın metin eşleşmedi.';
+              return;
+            }
+            Modal.close();
+            resolve(true);
+          };
+        },
+      });
+    });
+  },
 };
 
 const NAV_ITEMS = [
@@ -59,12 +92,13 @@ function renderBottomNav(currentHash) {
   }).join('');
 }
 
-function pageWrap(title, contentHtml, { back } = {}) {
+function pageWrap(title, contentHtml, { back, actions } = {}) {
   return `
     <div class="page">
       <div class="page-topbar">
         ${back ? `<a href="${back}" class="topbar-back">←</a>` : ''}
         <h1 class="page-title">${Utils.escapeHtml(title)}</h1>
+        ${actions ? `<div class="topbar-actions">${actions}</div>` : ''}
       </div>
       <div class="page-content">${contentHtml}</div>
     </div>

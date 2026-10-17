@@ -4,6 +4,7 @@ const ReportsView = {
     const students = [...State.data.students].sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
     const siniflar = State.getSiniflar();
     const terms = State.getTermsSorted();
+    const aktifDonem = State.getActiveTerm();
 
     return pageWrap('Raporlar', `
       <div class="card">
@@ -33,7 +34,7 @@ const ReportsView = {
           ${students.map((s) => `<option value="${s.id}">${Utils.escapeHtml(s.ad)} (${Utils.escapeHtml(s.sinif)})</option>`).join('')}
         </select>
         <select id="karne-term" class="input" style="margin-top:8px;">
-          ${terms.map((t) => `<option value="${t.id}">${Utils.escapeHtml(t.ad)}${!t.baslangicTarihi ? ' (tarih aralığı girilmedi)' : ''}</option>`).join('')}
+          ${terms.map((t) => `<option value="${t.id}" ${t.id === aktifDonem?.id ? 'selected' : ''}>${Utils.escapeHtml(t.ad)}${!t.baslangicTarihi ? ' (tarih aralığı girilmedi)' : ''}</option>`).join('')}
         </select>
         <div class="button-row">
           <button class="btn btn-secondary" id="karne-ai-metin">AI ile Değerlendirme Taslağı Oluştur</button>
@@ -48,7 +49,7 @@ const ReportsView = {
           ${siniflar.map((s) => `<option value="${Utils.escapeHtml(s)}">${Utils.escapeHtml(s)}</option>`).join('')}
         </select>
         <select id="report-term" class="input">
-          ${terms.map((t) => `<option value="${t.id}">${Utils.escapeHtml(t.ad)}</option>`).join('')}
+          ${terms.map((t) => `<option value="${t.id}" ${t.id === aktifDonem?.id ? 'selected' : ''}>${Utils.escapeHtml(t.ad)}</option>`).join('')}
         </select>
         <label class="field-label">Dahil Edilecek Bölümler</label>
         <div class="checkbox-list">

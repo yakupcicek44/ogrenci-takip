@@ -19,7 +19,7 @@ const DashboardView = {
     try { onboardingGorundu = localStorage.getItem('ogrenciTakipOnboarding') === '1'; } catch (e) { /* no-op */ }
 
     const siniflar = State.getSiniflar();
-    const ilkDonem = State.getTermsSorted()[0];
+    const aktifDonem = State.getActiveTerm();
 
     return pageWrap('Ana Sayfa', `
       ${!onboardingGorundu ? `
@@ -97,9 +97,9 @@ const DashboardView = {
         </div>
       ` : ''}
 
-      ${siniflar.length && ilkDonem ? `
+      ${siniflar.length && aktifDonem ? `
         <div class="card">
-          <div class="card-title">Sınıf Ortalamaları (${Utils.escapeHtml(ilkDonem.ad)})</div>
+          <div class="card-title">Sınıf Ortalamaları (${Utils.escapeHtml(aktifDonem.ad)})</div>
           <canvas id="chart-sinif-ortalama" height="180"></canvas>
         </div>
       ` : ''}
@@ -208,8 +208,8 @@ const DashboardView = {
     const ortalamaCanvas = document.getElementById('chart-sinif-ortalama');
     if (ortalamaCanvas) {
       const siniflar = State.getSiniflar();
-      const ilkDonem = State.getTermsSorted()[0];
-      const ortalamalar = siniflar.map((s) => Assessments.classAverage(s, ilkDonem.id));
+      const aktifDonem = State.getActiveTerm();
+      const ortalamalar = siniflar.map((s) => Assessments.classAverage(s, aktifDonem.id));
       new Chart(ortalamaCanvas, {
         type: 'bar',
         data: {

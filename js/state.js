@@ -15,6 +15,7 @@ const State = {
     reminders: [],
     notes: [],
     attendance: [],
+    documents: [],
     settings: null,
   },
 
@@ -35,6 +36,7 @@ const State = {
     d.reminders = await DB.getAll('reminders');
     d.notes = await DB.getAll('notes');
     d.attendance = await DB.getAll('attendance');
+    d.documents = await DB.getAll('documents');
     const settingsRows = await DB.getAll('settings');
     d.settings = settingsRows.find((s) => s.id === 'main') || null;
 
@@ -92,6 +94,16 @@ const State = {
 
   getTermsSorted() {
     return [...this.data.terms].sort((a, b) => a.sira - b.sira);
+  },
+
+  // Ayarlar'dan elle seçilen "aktif" dönem; seçilmemişse en sonuncu dönem varsayılır
+  // (yıl ilerledikçe öğretmen genelde en güncel dönemle ilgilenir).
+  getActiveTerm() {
+    const sorted = this.getTermsSorted();
+    if (!sorted.length) return null;
+    const explicitId = this.data.settings?.aktifDonemId;
+    const explicit = explicitId ? sorted.find((t) => t.id === explicitId) : null;
+    return explicit || sorted[sorted.length - 1];
   },
 
   getStudentAssessments(studentId, termId) {

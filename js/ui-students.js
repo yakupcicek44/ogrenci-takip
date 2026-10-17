@@ -77,13 +77,48 @@ const StudentListView = {
     const renderList = () => {
       const q = document.getElementById('student-search').value;
       const sinif = document.getElementById('student-sinif-filter').value;
-      const list = Students.search(q, sinif);
       const container = document.getElementById('student-list-container');
+
+      // Arama yapılmıyorsa ve bir sınıf seçilmediyse: öğrenci sayısı arttıkça liste
+      // uzamasın diye önce sınıf kartları gösterilir, dokununca o sınıfın listesi açılır.
+      if (!q.trim() && !sinif) {
+        const siniflar = State.getSiniflar();
+        if (!siniflar.length) {
+          container.innerHTML = emptyState('Kayıtlı öğrenci bulunamadı.', '🧑‍🎓');
+          return;
+        }
+        container.innerHTML = `
+          <div class="list">
+            ${siniflar.map((s) => {
+              const sayilar = Students.countBySinif(s);
+              return `
+                <a href="javascript:void(0)" class="list-item student-sinif-card" data-sinif="${Utils.escapeHtml(s)}">
+                  <div class="list-item-main">
+                    <div class="list-item-title">${Utils.escapeHtml(s)}</div>
+                    <div class="list-item-sub">${sayilar.aktif} aktif öğrenci${sayilar.pasif ? ' · ' + sayilar.pasif + ' pasif' : ''}</div>
+                  </div>
+                  <div class="list-item-arrow">›</div>
+                </a>
+              `;
+            }).join('')}
+          </div>
+        `;
+        container.querySelectorAll('.student-sinif-card').forEach((el) => {
+          el.addEventListener('click', () => {
+            document.getElementById('student-sinif-filter').value = el.dataset.sinif;
+            renderList();
+          });
+        });
+        return;
+      }
+
+      const list = Students.search(q, sinif);
       if (!list.length) {
         container.innerHTML = emptyState('Kayıtlı öğrenci bulunamadı.', '🧑‍🎓');
         return;
       }
-      container.innerHTML = `
+      const geriButon = (!q.trim() && sinif) ? `<button class="btn btn-secondary btn-sm" id="student-back-to-siniflar" style="margin-bottom:8px;">← Sınıflar</button>` : '';
+      container.innerHTML = geriButon + `
         <div class="list">
           ${list.map((s) => `
             <a href="#/ogrenci/${s.id}" class="list-item ${s.durum === 'pasif' ? 'list-item-muted' : ''}">
@@ -96,6 +131,10 @@ const StudentListView = {
           `).join('')}
         </div>
       `;
+      document.getElementById('student-back-to-siniflar')?.addEventListener('click', () => {
+        document.getElementById('student-sinif-filter').value = '';
+        renderList();
+      });
     };
 
     document.getElementById('student-search').addEventListener('input', Utils.debounce(renderList, 150));
@@ -186,12 +225,28 @@ const StudentDetailView = {
         `).join('')}
       </div>
       <div id="tab-content" class="tab-content"></div>
-    `, { back: '#/ogrenciler' });
+    `, {
+      back: '#/ogrenciler',
+      actions: `
+        <button class="topbar-icon-btn" id="student-export-pdf" title="PDF Rapor İndir">📄</button>
+        <button class="topbar-icon-btn" id="student-export-excel" title="Excel Rapor İndir">📊</button>
+      `,
+    });
   },
 
   mount(params) {
     const student = State.getStudent(params.id);
     if (!student) return;
+
+    document.getElementById('student-export-pdf').addEventListener('click', () => {
+      Reports.studentPDF(student.id);
+      Utils.toast('PDF indirildi.', 'success');
+    });
+    document.getElementById('student-export-excel').addEventListener('click', () => {
+      Reports.studentExcel(student.id);
+      Utils.toast('Excel indirildi.', 'success');
+    });
+
     const tab = params.tab || 'genel';
     const container = document.getElementById('tab-content');
     const renderers = {
@@ -251,11 +306,18 @@ const renderGenelTab = {
       Router.render();
     };
     document.getElementById('delete-student').onclick = async () => {
+      // Çift korumalı silme: önce genel onay, sonra öğrencinin adını tam yazarak teyit —
+      // yanlışlıkla tek tıkla kalıcı veri kaybını önlemek için.
       const ok = await Confirm.ask(
-        `${student.ad} adlı öğrenci ve TÜM kayıtları (notlar, ödevler, kitaplar, denemeler) kalıcı olarak silinecek. Bu işlem geri alınamaz. Onaylıyor musun?`,
-        { danger: true, confirmText: 'Evet, Sil' }
+        `${student.ad} adlı öğrenci ve TÜM kayıtları (notlar, ödevler, kitaplar, denemeler, yoklama) kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
+        { danger: true, confirmText: 'Devam Et' }
       );
       if (!ok) return;
+      const typedOk = await Confirm.askTyped(
+        'Bu ikinci onay, yanlışlıkla silmeyi önlemek içindir.',
+        student.ad
+      );
+      if (!typedOk) return;
       await Students.hardDelete(student.id);
       Utils.toast('Öğrenci silindi.', 'success');
       location.hash = '#/ogrenciler';

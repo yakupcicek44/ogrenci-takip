@@ -3,6 +3,7 @@ const SettingsView = {
   html() {
     const w = State.data.settings.agirliklar;
     const terms = State.getTermsSorted();
+    const aktifDonem = State.getActiveTerm();
     const sonYedek = State.data.settings.sonYedekTarihi;
 
     return pageWrap('Ayarlar', `
@@ -16,7 +17,9 @@ const SettingsView = {
         <div class="kv-row"><span>Gözlem Günlüğü</span><strong>${State.data.observations.length}</strong></div>
         <div class="kv-row"><span>Yoklama Kaydı</span><strong>${State.data.attendance.length}</strong></div>
         <div class="kv-row"><span>Görev / Hatırlatıcı / Not</span><strong>${State.data.tasks.length} / ${State.data.reminders.length} / ${State.data.notes.length}</strong></div>
+        <div class="kv-row"><span>Aktif Dönem</span><strong>${Utils.escapeHtml(aktifDonem?.ad || '-')}</strong></div>
         <div class="kv-row"><span>Taranan Kağıt (AI)</span><strong>${State.data.scans.length}</strong></div>
+        <div class="kv-row"><span>Belgeler</span><strong>${State.data.documents.length}</strong></div>
         <div class="kv-row"><span>Son JSON Yedek</span><strong>${sonYedek ? Utils.formatDateTimeTR(sonYedek) : 'Hiç alınmadı'}</strong></div>
         <div class="kv-row"><span>Son Drive Yedeği</span><strong>${State.data.settings.drive?.sonBasariliYedek ? Utils.formatDateTimeTR(State.data.settings.drive.sonBasariliYedek) : 'Bağlı değil / hiç alınmadı'}</strong></div>
         <div class="kv-row"><span>Tahmini Depolama</span><strong id="storage-estimate">hesaplanıyor…</strong></div>
@@ -50,13 +53,20 @@ const SettingsView = {
 
       <div class="card">
         <div class="card-title">Dönemler</div>
+        <p class="muted small">Aktif dönem; Ana Sayfa'daki grafiklerde ve rapor ekranlarındaki varsayılan seçimde kullanılır.</p>
         <div class="list" id="term-list">
-          ${terms.map((t) => `
-            <div class="list-item" data-id="${t.id}">
-              <div class="list-item-main"><div class="list-item-title">${Utils.escapeHtml(t.ad)}</div></div>
-              <button class="btn btn-secondary btn-sm edit-term" data-id="${t.id}">Düzenle</button>
-            </div>
-          `).join('')}
+          ${terms.map((t) => {
+            const aktif = t.id === aktifDonem?.id;
+            return `
+              <div class="list-item" data-id="${t.id}">
+                <div class="list-item-main"><div class="list-item-title">${Utils.escapeHtml(t.ad)}${aktif ? ' <span class="badge">Aktif</span>' : ''}</div></div>
+                <div style="display:flex;gap:6px;">
+                  ${!aktif ? `<button class="btn btn-secondary btn-sm set-active-term" data-id="${t.id}">Aktif Yap</button>` : ''}
+                  <button class="btn btn-secondary btn-sm edit-term" data-id="${t.id}">Düzenle</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
         <button class="btn btn-secondary btn-block" id="add-term">+ Dönem Ekle</button>
       </div>
@@ -313,6 +323,14 @@ const SettingsView = {
       });
     });
 
+    document.querySelectorAll('.set-active-term').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await State.save('settings', { ...State.data.settings, aktifDonemId: btn.dataset.id });
+        Utils.toast('Aktif dönem güncellendi.', 'success');
+        Router.render();
+      });
+    });
+
     document.getElementById('add-term').addEventListener('click', () => openTermForm(null));
     document.querySelectorAll('.edit-term').forEach((btn) => {
       btn.addEventListener('click', () => openTermForm(State.data.terms.find((t) => t.id === btn.dataset.id)));
@@ -430,7 +448,7 @@ const SettingsView = {
       if (!ok1) return;
       const ok2 = await Confirm.ask('Bu işlem GERİ ALINAMAZ. Gerçekten tüm verileri silmek istiyor musun?', { danger: true, confirmText: 'Evet, Sil' });
       if (!ok2) return;
-      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance']) {
+      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents']) {
         await DB.clear(store);
       }
       await State.init();

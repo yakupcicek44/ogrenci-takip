@@ -190,10 +190,41 @@ const HomeworkView = {
     const renderAssignmentList = () => {
       const durum = document.getElementById('hw-filter-durum').value;
       const sinif = document.getElementById('hw-filter-sinif').value;
-      const list = Homework.filterAll({ durum, sinif });
       const container = document.getElementById('hw-assignment-list');
+
+      // Sınıf seçilmediyse: ödev kontrolü/tarama için önce sınıf grubu gösterilir,
+      // dokununca o sınıfa ait ödev kayıtları (tüm öğrenciler yerine tek sınıf) açılır.
+      if (!sinif) {
+        const siniflar = State.getSiniflar();
+        if (!siniflar.length) { container.innerHTML = emptyState('Henüz sınıf yok.', '📝'); return; }
+        container.innerHTML = siniflar.map((s) => {
+          const rows = Homework.filterAll({ durum, sinif: s });
+          const eksik = rows.filter((r) => r.durum === 'eksik').length;
+          const bekliyor = rows.filter((r) => r.durum === 'bekliyor').length;
+          return `
+            <a href="javascript:void(0)" class="list-item odev-sinif-card" data-sinif="${Utils.escapeHtml(s)}">
+              <div class="list-item-main">
+                <div class="list-item-title">${Utils.escapeHtml(s)}</div>
+                <div class="list-item-sub">${rows.length} kayıt${eksik ? ` · ${eksik} eksik` : ''}${bekliyor ? ` · ${bekliyor} bekliyor` : ''}</div>
+              </div>
+              <div class="list-item-arrow">›</div>
+            </a>
+          `;
+        }).join('');
+        container.querySelectorAll('.odev-sinif-card').forEach((el) => {
+          el.addEventListener('click', () => {
+            document.getElementById('hw-filter-sinif').value = el.dataset.sinif;
+            renderAssignmentList();
+          });
+        });
+        return;
+      }
+
+      const list = Homework.filterAll({ durum, sinif });
       if (!list.length) { container.innerHTML = emptyState('Kayıt bulunamadı.', '📝'); return; }
-      container.innerHTML = list.map((row) => `
+      container.innerHTML = `
+        <button class="btn btn-secondary btn-sm" id="hw-back-to-siniflar" style="margin-bottom:8px;">← Sınıflar</button>
+      ` + list.map((row) => `
         <div class="list-item" data-id="${row.id}">
           <div class="list-item-main">
             <div class="list-item-title">${Utils.escapeHtml(row.task.ad)} — ${Utils.escapeHtml(row.student.ad)}</div>
@@ -202,6 +233,10 @@ const HomeworkView = {
           <button class="btn btn-secondary btn-sm edit-assignment" data-id="${row.id}">Düzenle</button>
         </div>
       `).join('');
+      document.getElementById('hw-back-to-siniflar').addEventListener('click', () => {
+        document.getElementById('hw-filter-sinif').value = '';
+        renderAssignmentList();
+      });
       container.querySelectorAll('.edit-assignment').forEach((btn) => {
         btn.onclick = () => openEditModal(btn.dataset.id);
       });

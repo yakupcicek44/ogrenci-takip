@@ -4,6 +4,7 @@ const ASSISTANT_TABS = [
   { key: 'gorevler', label: 'Görevler' },
   { key: 'hatirlaticilar', label: 'Hatırlatıcılar' },
   { key: 'notlar', label: 'Notlar' },
+  { key: 'belgeler', label: 'Belgeler' },
 ];
 
 const AssistantView = {
@@ -20,7 +21,7 @@ const AssistantView = {
   mount(params) {
     const tab = params.tab || 'gorevler';
     const container = document.getElementById('assistant-tab-content');
-    const renderers = { gorevler: renderGorevlerTab, hatirlaticilar: renderHatirlaticilarTab, notlar: renderNotlarTab };
+    const renderers = { gorevler: renderGorevlerTab, hatirlaticilar: renderHatirlaticilarTab, notlar: renderNotlarTab, belgeler: renderBelgelerTab };
     const renderer = renderers[tab] || renderGorevlerTab;
     container.innerHTML = renderer.html();
     renderer.mount();
@@ -394,6 +395,96 @@ const renderNotlarTab = {
     };
 
     document.getElementById('add-note').onclick = () => openNoteForm(null);
+    renderList();
+  },
+};
+
+// ---- Belgeler (yıllık plan, toplantı tutanağı gibi PDF/Word dosyaları) ----
+const renderBelgelerTab = {
+  html() {
+    return `
+      <div class="card">
+        <div class="card-title">Belge Yükle</div>
+        <p class="muted small">
+          Yıllık plan, toplantı tutanağı gibi PDF veya Word (.doc/.docx) dosyalarını yükleyip tek
+          yerden erişebilirsin. Dosyalar sadece bu cihazda saklanır ve JSON yedeğe dahil edilir —
+          çok büyük dosyalar yedek dosyasını büyütür, en fazla ${Documents.MAX_BOYUT / 1024 / 1024} MB.
+        </p>
+        <label class="field-label">Başlık (opsiyonel — boşsa dosya adı kullanılır)</label>
+        <input type="text" id="doc-ad" class="input">
+        <label class="field-label">Kategori</label>
+        <select id="doc-kategori" class="input">
+          ${Documents.KATEGORILER.map((k) => `<option value="${k.key}">${k.etiket}</option>`).join('')}
+        </select>
+        <label class="btn btn-primary btn-block" id="doc-upload-label" style="text-align:center; display:block; margin-top:10px;">
+          Dosya Seç ve Yükle
+          <input type="file" id="doc-upload-input" accept=".pdf,.doc,.docx" style="display:none;">
+        </label>
+        <div id="doc-upload-status" class="muted small" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="toolbar">
+        <select id="doc-filter-kategori" class="input">
+          <option value="">Tüm Kategoriler</option>
+          ${Documents.KATEGORILER.map((k) => `<option value="${k.key}">${k.etiket}</option>`).join('')}
+        </select>
+      </div>
+      <div id="doc-list" class="list"></div>
+    `;
+  },
+
+  mount() {
+    const renderList = () => {
+      const kategori = document.getElementById('doc-filter-kategori').value;
+      const list = Documents.filterByKategori(kategori);
+      const container = document.getElementById('doc-list');
+      if (!list.length) { container.innerHTML = emptyState('Henüz belge yüklenmedi.', '📄'); return; }
+      container.innerHTML = list.map((d) => {
+        const kat = Documents.KATEGORILER.find((k) => k.key === d.kategori);
+        return `
+          <div class="list-item" data-id="${d.id}">
+            <div class="list-item-main">
+              <div class="list-item-title">${Utils.escapeHtml(d.ad)}</div>
+              <div class="list-item-sub"><span class="badge">${kat ? kat.etiket : d.kategori}</span> · ${(d.boyut / 1024 / 1024).toFixed(1)} MB · ${Utils.formatDateTR(d.olusturmaTarihi)}</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-secondary btn-sm doc-download" data-id="${d.id}">İndir</button>
+              <button class="btn btn-danger btn-sm doc-delete" data-id="${d.id}">Sil</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      container.querySelectorAll('.doc-download').forEach((btn) => {
+        btn.onclick = () => Documents.download(list.find((d) => d.id === btn.dataset.id));
+      });
+      container.querySelectorAll('.doc-delete').forEach((btn) => {
+        btn.onclick = async () => {
+          const ok = await Confirm.ask('Bu belge silinsin mi?', { danger: true });
+          if (!ok) return;
+          await Documents.remove(btn.dataset.id);
+          renderList();
+        };
+      });
+    };
+
+    document.getElementById('doc-upload-input').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const statusEl = document.getElementById('doc-upload-status');
+      statusEl.textContent = 'Yükleniyor…';
+      const result = await Documents.upload(file, {
+        ad: document.getElementById('doc-ad').value,
+        kategori: document.getElementById('doc-kategori').value,
+      });
+      statusEl.textContent = '';
+      e.target.value = '';
+      if (!result.ok) { Utils.toast(result.errors.join(' '), 'error'); return; }
+      document.getElementById('doc-ad').value = '';
+      Utils.toast('Belge yüklendi.', 'success');
+      renderList();
+    });
+
+    document.getElementById('doc-filter-kategori').addEventListener('change', renderList);
     renderList();
   },
 };
