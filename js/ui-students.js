@@ -69,7 +69,7 @@ const StudentListView = {
         </label>
       </div>
       <div id="student-list-container"></div>
-      <button class="fab" id="add-student-fab" title="Öğrenci Ekle">+</button>
+      <button class="fab" id="add-student-fab" title="Öğrenci Ekle" aria-label="Öğrenci Ekle">+</button>
     `);
   },
 
@@ -228,8 +228,8 @@ const StudentDetailView = {
     `, {
       back: '#/ogrenciler',
       actions: `
-        <button class="topbar-icon-btn" id="student-export-pdf" title="PDF Rapor İndir">📄</button>
-        <button class="topbar-icon-btn" id="student-export-excel" title="Excel Rapor İndir">📊</button>
+        <button class="topbar-icon-btn" id="student-export-pdf" title="PDF Rapor İndir" aria-label="PDF Rapor İndir">📄</button>
+        <button class="topbar-icon-btn" id="student-export-excel" title="Excel Rapor İndir" aria-label="Excel Rapor İndir">📊</button>
       `,
     });
   },
@@ -355,9 +355,9 @@ const renderGenelTab = {
           });
           if (obs) {
             root.querySelector('#obs-delete').onclick = async () => {
-              const ok = await Confirm.ask('Bu gözlem kaydı silinsin mi?', { danger: true });
+              const ok = await Confirm.ask('Bu gözlem kaydı silinsin mi? (Çöp Kutusu\'ndan geri alınabilir)', { danger: true });
               if (!ok) return;
-              await Observations.remove(obs.id);
+              await Trash.moveToTrash('observations', obs, `${Utils.formatDateTR(obs.tarih)} gözlem — ${student.ad}: ${obs.metin.slice(0, 50)}`);
               Modal.close();
               renderObservations();
             };
@@ -687,9 +687,9 @@ const renderKitapTab = {
           root.querySelector('#bk-cancel').onclick = () => Modal.close();
           if (book) {
             root.querySelector('#bk-delete').onclick = async () => {
-              const ok = await Confirm.ask('Bu kitap kaydı silinsin mi?', { danger: true });
+              const ok = await Confirm.ask('Bu kitap kaydı silinsin mi? (Çöp Kutusu\'ndan geri alınabilir)', { danger: true });
               if (!ok) return;
-              await Books.remove(book.id);
+              await Trash.moveToTrash('books', book, `Kitap: ${book.kitapAdi} — ${student.ad}`);
               Modal.close();
               renderList();
             };
@@ -800,9 +800,9 @@ const renderDenemeTab = {
           root.querySelector('#ex-cancel').onclick = () => Modal.close();
           if (exam) {
             root.querySelector('#ex-delete').onclick = async () => {
-              const ok = await Confirm.ask('Bu deneme sonucu silinsin mi?', { danger: true });
+              const ok = await Confirm.ask('Bu deneme sonucu silinsin mi? (Çöp Kutusu\'ndan geri alınabilir)', { danger: true });
               if (!ok) return;
-              await MockExams.remove(exam.id);
+              await Trash.moveToTrash('mockExams', exam, `Deneme: ${exam.denemeAdi} — ${student.ad}`);
               Modal.close();
               renderAll();
             };
@@ -913,6 +913,8 @@ const renderYoklamaTab = {
         onMount: (root) => {
           root.querySelector('#at-cancel').onclick = () => Modal.close();
           root.querySelector('#at-delete').onclick = async () => {
+            const ok = await Confirm.ask('Bu yoklama kaydı silinsin mi?', { danger: true });
+            if (!ok) return;
             await Attendance.unmark(student.id, root.querySelector('#at-tarih').value);
             Modal.close();
             renderList();

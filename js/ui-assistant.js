@@ -118,9 +118,12 @@ const renderGorevlerTab = {
         onMount: (root) => {
           root.querySelector('#td-cancel').onclick = () => Modal.close();
           root.querySelector('#td-delete').onclick = async () => {
-            const ok = await Confirm.ask('Bu görev (ve alt görevleri) silinsin mi?', { danger: true });
+            const ok = await Confirm.ask('Bu görev (ve alt görevleri) silinsin mi? (Çöp Kutusu\'ndan geri alınabilir)', { danger: true });
             if (!ok) return;
-            await Tasks.remove(task.id);
+            for (const alt of State.getSubtasks(task.id)) {
+              await Trash.moveToTrash('tasks', alt, `Alt görev: ${alt.baslik}`);
+            }
+            await Trash.moveToTrash('tasks', task, `Görev: ${task.baslik}`);
             Modal.close();
             renderList();
           };
@@ -294,9 +297,13 @@ const renderHatirlaticilarTab = {
       });
       container.querySelectorAll('.rem-delete').forEach((btn) => {
         btn.onclick = async () => {
-          const ok = await Confirm.ask('Bu hatırlatıcı silinsin mi?', {});
+          const ok = await Confirm.ask('Bu hatırlatıcı silinsin mi? (Çöp Kutusu\'ndan geri alınabilir)', {});
           if (!ok) return;
-          await Reminders.remove(btn.dataset.id);
+          const r = State.getReminder(btn.dataset.id);
+          await Trash.moveToTrash('reminders', r, `Hatırlatıcı: ${r.metin}`);
+          // Reminders.remove() aynı zamanda sunucudaki push senkronunu da siler —
+          // çöpe atarken bunu atlamamalı, yoksa "silinen" hatırlatıcı yine bildirim gönderebilir.
+          Push.deleteReminderSync(r.id);
           renderList();
         };
       });
@@ -352,9 +359,9 @@ const renderNotlarTab = {
           root.querySelector('#note-cancel').onclick = () => Modal.close();
           if (note) {
             root.querySelector('#note-delete').onclick = async () => {
-              const ok = await Confirm.ask('Bu not silinsin mi?', { danger: true });
+              const ok = await Confirm.ask('Bu not silinsin mi? (Çöp Kutusu\'ndan geri alınabilir)', { danger: true });
               if (!ok) return;
-              await Notes.remove(note.id);
+              await Trash.moveToTrash('notes', note, `Not: ${note.baslik || note.metin.slice(0, 40)}`);
               Modal.close();
               renderList();
             };
@@ -459,9 +466,10 @@ const renderBelgelerTab = {
       });
       container.querySelectorAll('.doc-delete').forEach((btn) => {
         btn.onclick = async () => {
-          const ok = await Confirm.ask('Bu belge silinsin mi?', { danger: true });
+          const ok = await Confirm.ask('Bu belge silinsin mi? (Çöp Kutusu\'ndan geri alınabilir)', { danger: true });
           if (!ok) return;
-          await Documents.remove(btn.dataset.id);
+          const d = list.find((x) => x.id === btn.dataset.id);
+          await Trash.moveToTrash('documents', d, `Belge: ${d.ad}`);
           renderList();
         };
       });

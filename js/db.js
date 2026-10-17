@@ -1,6 +1,6 @@
 // IndexedDB katmanı — tüm kalıcı veri burada tutulur (geçici bellek kullanılmaz)
 const DB_NAME = 'ogrenci-takip-db';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 let dbInstance = null;
 
@@ -92,6 +92,13 @@ function openDB() {
       if (!db.objectStoreNames.contains('documents')) {
         const doc = db.createObjectStore('documents', { keyPath: 'id' });
         doc.createIndex('kategori', 'kategori', { unique: false });
+      }
+
+      // Çöp Kutusu — tek kayıtlık silmeler (gözlem, kitap, deneme, görev, hatırlatıcı,
+      // not, belge) kalıcı silinmeden önce buraya taşınır.
+      if (!db.objectStoreNames.contains('trash')) {
+        const t = db.createObjectStore('trash', { keyPath: 'id' });
+        t.createIndex('store', 'store', { unique: false });
       }
 
       // v2 -> v3: eski tek metinlik "gozlemNotlari" alanını kaybetmemek için
@@ -198,7 +205,7 @@ const DB = {
 
   // Tüm store'ları tek bir nesnede döndürür (JSON yedekleme için)
   async exportAll() {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'settings'];
     const result = {};
     for (const n of names) {
       result[n] = await DB.getAll(n);
@@ -208,7 +215,7 @@ const DB = {
 
   // JSON yedekten tüm store'ları geri yükler (önce temizler, sonra yazar)
   async importAll(data) {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'settings'];
+    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'settings'];
     for (const n of names) {
       await DB.clear(n);
       if (Array.isArray(data[n]) && data[n].length) {

@@ -20,6 +20,7 @@ const SettingsView = {
         <div class="kv-row"><span>Aktif Dönem</span><strong>${Utils.escapeHtml(aktifDonem?.ad || '-')}</strong></div>
         <div class="kv-row"><span>Taranan Kağıt (AI)</span><strong>${State.data.scans.length}</strong></div>
         <div class="kv-row"><span>Belgeler</span><strong>${State.data.documents.length}</strong></div>
+        <div class="kv-row"><span>Çöp Kutusu</span><strong>${State.data.trash.length}</strong></div>
         <div class="kv-row"><span>Son JSON Yedek</span><strong>${sonYedek ? Utils.formatDateTimeTR(sonYedek) : 'Hiç alınmadı'}</strong></div>
         <div class="kv-row"><span>Son Drive Yedeği</span><strong>${State.data.settings.drive?.sonBasariliYedek ? Utils.formatDateTimeTR(State.data.settings.drive.sonBasariliYedek) : 'Bağlı değil / hiç alınmadı'}</strong></div>
         <div class="kv-row"><span>Tahmini Depolama</span><strong id="storage-estimate">hesaplanıyor…</strong></div>
@@ -97,7 +98,7 @@ const SettingsView = {
           ${Observations.getBeceriEtiketleri().map((b) => `
             <span class="badge" data-tag="${Utils.escapeHtml(b)}" style="display:flex;align-items:center;gap:4px;">
               ${Utils.escapeHtml(b)}
-              <button class="remove-beceri" data-tag="${Utils.escapeHtml(b)}" style="border:none;background:none;color:inherit;cursor:pointer;font-weight:800;padding:0;">×</button>
+              <button class="remove-beceri" data-tag="${Utils.escapeHtml(b)}" aria-label="${Utils.escapeHtml(b)} etiketini kaldır" style="border:none;background:none;color:inherit;cursor:pointer;font-weight:800;padding:0;">×</button>
             </span>
           `).join('')}
         </div>
@@ -145,6 +146,13 @@ const SettingsView = {
         <p class="muted small">Kullanıcı adı: ${Utils.escapeHtml(State.data.settings.auth?.username || '-')}</p>
         <button class="btn btn-secondary btn-block" id="change-password">Şifre Değiştir</button>
         <button class="btn btn-secondary btn-block" id="logout" style="margin-top:8px;">Çıkış Yap</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Çöp Kutusu</div>
+        <p class="muted small">Gözlem, kitap, deneme, görev, hatırlatıcı, not ve belge silmeleri ${Trash.SAKLAMA_GUNU} gün burada saklanır, geri yüklenebilir.</p>
+        <div class="kv-row"><span>Çöp Kutusunda</span><strong>${State.data.trash.length} kayıt</strong></div>
+        <button class="btn btn-secondary btn-block" id="open-trash" style="margin-top:8px;">Çöp Kutusunu Aç</button>
       </div>
 
       <div class="card card-danger">
@@ -323,6 +331,8 @@ const SettingsView = {
       });
     });
 
+    document.getElementById('open-trash').addEventListener('click', () => { location.hash = '#/cop-kutusu'; });
+
     document.querySelectorAll('.set-active-term').forEach((btn) => {
       btn.addEventListener('click', async () => {
         await State.save('settings', { ...State.data.settings, aktifDonemId: btn.dataset.id });
@@ -448,7 +458,7 @@ const SettingsView = {
       if (!ok1) return;
       const ok2 = await Confirm.ask('Bu işlem GERİ ALINAMAZ. Gerçekten tüm verileri silmek istiyor musun?', { danger: true, confirmText: 'Evet, Sil' });
       if (!ok2) return;
-      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents']) {
+      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash']) {
         await DB.clear(store);
       }
       await State.init();

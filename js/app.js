@@ -11,6 +11,7 @@ const Router = {
     { pattern: /^#\/asistan\/([^/]+)$/, view: AssistantView, params: ['tab'] },
     { pattern: /^#\/raporlar$/, view: ReportsView },
     { pattern: /^#\/ayarlar$/, view: SettingsView },
+    { pattern: /^#\/cop-kutusu$/, view: TrashView },
   ],
 
   resolve(hashWithQuery) {
@@ -64,6 +65,7 @@ function maybeAutoDriveBackup() {
 async function boot() {
   document.getElementById('bottom-nav').style.display = '';
   if (!location.hash) location.hash = '#/';
+  await Trash.purgeExpired();
   await Router.render();
   registerServiceWorker();
   Utils.markSaved();

@@ -4,7 +4,7 @@ const Modal = {
     const root = document.getElementById('modal-root');
     root.innerHTML = `
       <div class="modal-overlay" id="modal-overlay">
-        <div class="modal-box" id="modal-box">${html}</div>
+        <div class="modal-box" id="modal-box" role="dialog" aria-modal="true">${html}</div>
       </div>`;
     root.querySelector('#modal-overlay').addEventListener('click', (e) => {
       if (e.target.id === 'modal-overlay') Modal.close();
@@ -85,8 +85,8 @@ function renderBottomNav(currentHash) {
   const activeBase = '#/' + (currentHash.split('/')[1] || '');
   nav.innerHTML = NAV_ITEMS.map((item) => {
     const isActive = item.route === activeBase || (item.route === '#/' && activeBase === '#/');
-    return `<a href="${item.route}" class="nav-item ${isActive ? 'active' : ''}">
-      <span class="nav-icon">${item.icon}</span>
+    return `<a href="${item.route}" class="nav-item ${isActive ? 'active' : ''}" aria-current="${isActive ? 'page' : 'false'}">
+      <span class="nav-icon" aria-hidden="true">${item.icon}</span>
       <span class="nav-label">${item.label}</span>
     </a>`;
   }).join('');

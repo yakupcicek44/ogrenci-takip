@@ -16,6 +16,7 @@ const State = {
     notes: [],
     attendance: [],
     documents: [],
+    trash: [],
     settings: null,
   },
 
@@ -37,6 +38,7 @@ const State = {
     d.notes = await DB.getAll('notes');
     d.attendance = await DB.getAll('attendance');
     d.documents = await DB.getAll('documents');
+    d.trash = await DB.getAll('trash');
     const settingsRows = await DB.getAll('settings');
     d.settings = settingsRows.find((s) => s.id === 'main') || null;
 
