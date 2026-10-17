@@ -266,7 +266,7 @@ const SettingsView = {
       if (!ok1) return;
       const ok2 = await Confirm.ask('Bu işlem GERİ ALINAMAZ. Gerçekten tüm verileri silmek istiyor musun?', { danger: true, confirmText: 'Evet, Sil' });
       if (!ok2) return;
-      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks']) {
+      for (const store of ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes']) {
         await DB.clear(store);
       }
       await State.init();

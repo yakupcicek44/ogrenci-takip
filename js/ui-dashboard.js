@@ -47,13 +47,17 @@ const DashboardView = {
 
       ${(() => {
         const bugunGorevleri = Tasks.getDashboardTasks();
-        if (!bugunGorevleri.length) return '';
+        const bugunHatirlaticilar = Reminders.getToday();
+        if (!bugunGorevleri.length && !bugunHatirlaticilar.length) return '';
         return `
           <div class="card">
-            <div class="card-title">Bugünkü Görevler</div>
+            <div class="card-title">Bugün — Asistan</div>
             <ul class="simple-list">
-              ${bugunGorevleri.slice(0, 5).map((t) => `
-                <li>${t.oncelik === 'yuksek' ? '🔴 ' : ''}${Utils.escapeHtml(t.baslik)}${Tasks.isOverdue(t) ? ' <strong style="color:var(--danger)">(gecikti)</strong>' : ''}</li>
+              ${bugunGorevleri.slice(0, 4).map((t) => `
+                <li>✅ ${t.oncelik === 'yuksek' ? '🔴 ' : ''}${Utils.escapeHtml(t.baslik)}${Tasks.isOverdue(t) ? ' <strong style="color:var(--danger)">(gecikti)</strong>' : ''}</li>
+              `).join('')}
+              ${bugunHatirlaticilar.slice(0, 4).map((r) => `
+                <li>⏰ ${Utils.escapeHtml(r.metin)}${r.saat ? ' · ' + r.saat : ''}</li>
               `).join('')}
             </ul>
             <a href="#/asistan" class="btn btn-secondary btn-block" style="margin-top:8px;">Asistanı Aç</a>

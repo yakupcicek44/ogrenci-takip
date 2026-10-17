@@ -7,6 +7,7 @@ const Router = {
     { pattern: /^#\/ogrenci\/([^/]+)\/([^/]+)$/, view: StudentDetailView, params: ['id', 'tab'] },
     { pattern: /^#\/odev-atama$/, view: HomeworkView },
     { pattern: /^#\/asistan$/, view: AssistantView },
+    { pattern: /^#\/asistan\/([^/]+)$/, view: AssistantView, params: ['tab'] },
     { pattern: /^#\/raporlar$/, view: ReportsView },
     { pattern: /^#\/ayarlar$/, view: SettingsView },
   ],

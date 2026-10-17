@@ -12,6 +12,8 @@ const State = {
     scans: [],
     observations: [],
     tasks: [],
+    reminders: [],
+    notes: [],
     settings: null,
   },
 
@@ -29,6 +31,8 @@ const State = {
     d.scans = await DB.getAll('scans');
     d.observations = await DB.getAll('observations');
     d.tasks = await DB.getAll('tasks');
+    d.reminders = await DB.getAll('reminders');
+    d.notes = await DB.getAll('notes');
     const settingsRows = await DB.getAll('settings');
     d.settings = settingsRows.find((s) => s.id === 'main') || null;
 
@@ -126,6 +130,22 @@ const State = {
 
   getTopLevelTasks() {
     return this.data.tasks.filter((t) => !t.ustGorevId);
+  },
+
+  getReminder(id) {
+    return this.data.reminders.find((r) => r.id === id) || null;
+  },
+
+  getStudentReminders(studentId) {
+    return this.data.reminders.filter((r) => r.studentId === studentId);
+  },
+
+  getNote(id) {
+    return this.data.notes.find((n) => n.id === id) || null;
+  },
+
+  getStudentNotes(studentId) {
+    return this.data.notes.filter((n) => n.studentId === studentId).sort((a, b) => (b.guncellemeTarihi || '').localeCompare(a.guncellemeTarihi || ''));
   },
 
   getHomeworkTask(id) {
