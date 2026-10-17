@@ -7,6 +7,22 @@ const SettingsView = {
 
     return pageWrap('Ayarlar', `
       <div class="card">
+        <div class="card-title">Sistem Durumu</div>
+        <div class="kv-row"><span>Sürüm</span><strong>${APP_VERSION}</strong></div>
+        <div class="kv-row"><span>Öğrenci</span><strong>${State.getActiveStudents().length} aktif${State.data.students.length - State.getActiveStudents().length ? ' · ' + (State.data.students.length - State.getActiveStudents().length) + ' pasif' : ''}</strong></div>
+        <div class="kv-row"><span>Sınav/Performans Notu</span><strong>${State.data.assessments.filter((a) => !Utils.isEmptyGrade(a.puan)).length}</strong></div>
+        <div class="kv-row"><span>Ödev / Atama</span><strong>${State.data.homeworkTasks.length} ödev · ${State.data.homeworkAssignments.length} atama</strong></div>
+        <div class="kv-row"><span>Kitap / Deneme</span><strong>${State.data.books.length} / ${State.data.mockExams.length}</strong></div>
+        <div class="kv-row"><span>Gözlem Günlüğü</span><strong>${State.data.observations.length}</strong></div>
+        <div class="kv-row"><span>Yoklama Kaydı</span><strong>${State.data.attendance.length}</strong></div>
+        <div class="kv-row"><span>Görev / Hatırlatıcı / Not</span><strong>${State.data.tasks.length} / ${State.data.reminders.length} / ${State.data.notes.length}</strong></div>
+        <div class="kv-row"><span>Taranan Kağıt (AI)</span><strong>${State.data.scans.length}</strong></div>
+        <div class="kv-row"><span>Son JSON Yedek</span><strong>${sonYedek ? Utils.formatDateTimeTR(sonYedek) : 'Hiç alınmadı'}</strong></div>
+        <div class="kv-row"><span>Son Drive Yedeği</span><strong>${State.data.settings.drive?.sonBasariliYedek ? Utils.formatDateTimeTR(State.data.settings.drive.sonBasariliYedek) : 'Bağlı değil / hiç alınmadı'}</strong></div>
+        <div class="kv-row"><span>Tahmini Depolama</span><strong id="storage-estimate">hesaplanıyor…</strong></div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Görünüm</div>
         <div class="theme-picker">
           ${Theme.OPTIONS.map((o) => `
@@ -130,6 +146,22 @@ const SettingsView = {
   },
 
   mount() {
+    if (navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate().then((est) => {
+        const el = document.getElementById('storage-estimate');
+        if (!el) return;
+        const usedMB = est.usage ? (est.usage / (1024 * 1024)).toFixed(1) : '0';
+        const quotaMB = est.quota ? (est.quota / (1024 * 1024)).toFixed(0) : null;
+        el.textContent = quotaMB ? `${usedMB} MB / ~${quotaMB} MB` : `${usedMB} MB`;
+      }).catch(() => {
+        const el = document.getElementById('storage-estimate');
+        if (el) el.textContent = 'bilinmiyor';
+      });
+    } else {
+      const el = document.getElementById('storage-estimate');
+      if (el) el.textContent = 'tarayıcı desteklemiyor';
+    }
+
     document.querySelectorAll('[data-theme-option]').forEach((el) => {
       el.addEventListener('click', () => {
         Theme.set(el.dataset.themeOption);
