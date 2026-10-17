@@ -1,6 +1,7 @@
 // Hatırlatıcılar — Öğretmen Asistanı'nın zaman/saat bazlı parçası. Görevden farkı: alt görevi
-// yok, önceliği yok, sadece "bu tarihte/saatte bunu unutma" notu. Telefon bildirimi göndermez,
-// sadece uygulama açıkken (Ana Sayfa + Asistan) gösterilir.
+// yok, önceliği yok, sadece "bu tarihte/saatte bunu unutma" notu.
+// Bildirim senkronizasyonu (Push.*) her zaman "best effort" ve sessizdir: push etkin değilse
+// veya cihaz çevrimdışıysa bu fonksiyonlar hiçbir şey yapmaz, yerel kayıt her durumda çalışır.
 function validDate(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v || ''); }
 function validTime(v) { return /^\d{2}:\d{2}$/.test(v || ''); }
 
@@ -19,17 +20,22 @@ const Reminders = {
       olusturmaTarihi: new Date().toISOString(),
     };
     await State.save('reminders', record);
+    Push.syncReminder(record);
     return { ok: true, record };
   },
 
   async toggle(id) {
     const r = State.getReminder(id);
     if (!r) return;
-    await State.save('reminders', { ...r, tamamlandi: !r.tamamlandi });
+    const updated = { ...r, tamamlandi: !r.tamamlandi };
+    await State.save('reminders', updated);
+    if (updated.tamamlandi) Push.deleteReminderSync(id);
+    else Push.syncReminder(updated);
   },
 
   async remove(id) {
     await State.remove('reminders', id);
+    Push.deleteReminderSync(id);
   },
 
   getToday() {

@@ -200,6 +200,19 @@ const renderHatirlaticilarTab = {
   html() {
     const students = [...State.data.students].sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
     return `
+      <div class="card" id="push-card">
+        <div class="card-title">Bildirimler</div>
+        <p class="muted small">
+          Açarsan, hatırlatıcı zamanı geldiğinde telefon kilitli veya uygulama kapalı olsa
+          bile gerçek bir bildirim gelir (WhatsApp mesajı gibi — sessiz moddaysa o da sessiz
+          kalır, bu bir çalar saat değildir). Açtığında hatırlatıcı metni+zamanı Yakup'un
+          kendi Cloudflare hesabına gönderilir, başka hiçbir veri gitmez.
+        </p>
+        <div id="push-status" class="muted small" style="margin-bottom:8px;"></div>
+        <button class="btn btn-primary btn-block" id="push-enable">Bildirimleri Aç</button>
+        <button class="btn btn-secondary btn-block" id="push-disable" style="display:none;">Bildirimleri Kapat</button>
+      </div>
+
       <div class="card">
         <div class="card-title">Yeni Hatırlatıcı</div>
         <input type="text" id="new-rem-metin" class="input" placeholder="Örn: Ayşe'nin velisini ara">
@@ -213,13 +226,34 @@ const renderHatirlaticilarTab = {
         </select>
         <div id="new-rem-errors" class="form-errors"></div>
         <button class="btn btn-primary btn-block" id="new-rem-submit" style="margin-top:10px;">Hatırlatıcı Ekle</button>
-        <p class="muted small" style="margin-top:8px;">Bu, telefonuna bildirim göndermez — sadece uygulamayı açtığında burada ve Ana Sayfa'da görünür.</p>
       </div>
       <div id="reminder-list" class="list"></div>
     `;
   },
 
   mount() {
+    this._refreshPushCard();
+
+    document.getElementById('push-enable').addEventListener('click', async () => {
+      const statusEl = document.getElementById('push-status');
+      statusEl.textContent = 'İzin isteniyor…';
+      const result = await Push.enable();
+      if (!result.ok) {
+        statusEl.textContent = '';
+        Utils.toast(result.error, 'error');
+        return;
+      }
+      statusEl.textContent = '';
+      Utils.toast('Bildirimler açıldı.', 'success');
+      this._refreshPushCard();
+    });
+
+    document.getElementById('push-disable').addEventListener('click', async () => {
+      await Push.disable();
+      Utils.toast('Bildirimler kapatıldı.', 'info');
+      this._refreshPushCard();
+    });
+
     document.getElementById('new-rem-submit').addEventListener('click', async () => {
       const result = await Reminders.create({
         metin: document.getElementById('new-rem-metin').value,
@@ -268,6 +302,22 @@ const renderHatirlaticilarTab = {
     };
 
     renderList();
+  },
+
+  async _refreshPushCard() {
+    const enableBtn = document.getElementById('push-enable');
+    const disableBtn = document.getElementById('push-disable');
+    const statusEl = document.getElementById('push-status');
+    if (!Push.isSupported()) {
+      statusEl.textContent = 'Bu tarayıcı bildirim desteklemiyor.';
+      enableBtn.style.display = 'none';
+      disableBtn.style.display = 'none';
+      return;
+    }
+    const enabled = await Push.isEnabled();
+    statusEl.textContent = enabled ? 'Durum: Açık' : 'Durum: Kapalı';
+    enableBtn.style.display = enabled ? 'none' : '';
+    disableBtn.style.display = enabled ? '' : 'none';
   },
 };
 

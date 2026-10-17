@@ -1,6 +1,6 @@
 // Service Worker — çevrimdışı çalışma için uygulama kabuğunu ve kütüphaneleri önbelleğe alır.
 // Veri (öğrenci kayıtları vb.) burada DEĞİL, cihazdaki IndexedDB'de tutulur.
-const CACHE_NAME = 'ogrenci-takip-v7';
+const CACHE_NAME = 'ogrenci-takip-v8';
 
 const PRECACHE_URLS = [
   './',
@@ -24,6 +24,7 @@ const PRECACHE_URLS = [
   './js/notes.js',
   './js/scan.js',
   './js/drive.js',
+  './js/push.js',
   './js/reports.js',
   './js/ui-common.js',
   './js/ui-auth.js',
@@ -55,6 +56,37 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => Promise.all(
       keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
     )).then(() => self.clients.claim())
+  );
+});
+
+// Telefon kilitliyken/uygulama kapalıyken gelen push bildirimi — sunucudaki (Yakup'un
+// kendi Cloudflare hesabı) zamanlanmış görev tetikler. Sessiz moddayken/Rahatsız Etmeyin
+// açıkken diğer tüm bildirimler gibi sessiz kalır, bu normal bir bildirimdir, alarm değildir.
+self.addEventListener('push', (event) => {
+  let data = { title: 'Hatırlatıcı', body: 'Yeni bir hatırlatıcın var.' };
+  try { if (event.data) data = event.data.json(); } catch (e) { /* no-op */ }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Hatırlatıcı', {
+      body: data.body || '',
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+      vibrate: [200, 100, 200],
+      tag: data.tag || undefined,
+      data: { url: data.url || './' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(location.origin) && 'focus' in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
   );
 });
 
