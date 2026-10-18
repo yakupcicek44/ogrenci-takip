@@ -1,6 +1,6 @@
 // Her gerçek deploy'da elle artırılır — Ayarlar'daki Sistem Durumu'nda görünür,
 // yeni sürümün telefona gerçekten indiğini doğrulamanın en kolay yolu budur.
-const APP_VERSION = '2026.10.18-02';
+const APP_VERSION = '2026.10.19-01';
 
 // Ortak yardımcı fonksiyonlar
 const Utils = {
@@ -8,8 +8,20 @@ const Utils = {
     return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
   },
 
+  // Date nesnesini ISO (yyyy-mm-dd) dizgeye LOKAL bileşenlerle çevirir. toISOString()
+  // önce UTC'ye çevirir — Türkiye (UTC+3) gibi ileri saat dilimlerinde gece yarısından
+  // sabah 03:00'e kadar günü BİR GÜN GERİYE kaydırır (örn. 18 Ekim 01:00'de "17 Ekim"
+  // döner). Bu, uygulamanın her yerde "bugün" için kullandığı todayISO() için ciddi bir
+  // hataydı — schedule.js'deki aynı hata sınıfıyla aynı kök neden.
+  dateToISO(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
   todayISO() {
-    return new Date().toISOString().slice(0, 10);
+    return this.dateToISO(new Date());
   },
 
   formatDateTR(isoStr) {

@@ -303,8 +303,8 @@ const renderHatirlaticilarTab = {
           if (!ok) return;
           const r = State.getReminder(btn.dataset.id);
           await Trash.moveToTrash('reminders', r, `Hatırlatıcı: ${r.metin}`);
-          // Reminders.remove() aynı zamanda sunucudaki push senkronunu da siler —
-          // çöpe atarken bunu atlamamalı, yoksa "silinen" hatırlatıcı yine bildirim gönderebilir.
+          // Çöpe atarken sunucudaki push senkronunu da silmeliyiz, yoksa "silinen"
+          // hatırlatıcı Çöp Kutusu'ndayken bile yine bildirim gönderebilir.
           Push.deleteReminderSync(r.id);
           renderList();
         };
@@ -325,7 +325,11 @@ const renderHatirlaticilarTab = {
       return;
     }
     const enabled = await Push.isEnabled();
-    statusEl.textContent = enabled ? 'Durum: Açık' : 'Durum: Kapalı';
+    const izin = Push.getPermission();
+    // İzin "denied" ise tarayıcı/telefon ayarlarından elle açılmadan tekrar izin
+    // istemek işe yaramaz — bunu ayrıca belirtiyoruz ki buton boşuna tıklanmasın.
+    const izinNotu = !enabled && izin === 'denied' ? ' (izin reddedilmiş — telefon/tarayıcı bildirim ayarlarından elle açman gerekir)' : '';
+    statusEl.textContent = (enabled ? 'Durum: Açık' : 'Durum: Kapalı') + izinNotu;
     enableBtn.style.display = enabled ? 'none' : '';
     disableBtn.style.display = enabled ? '' : 'none';
   },
@@ -651,9 +655,18 @@ const renderDersProgramiTab = {
           });
           root.querySelector('#dp-edit-template').onclick = () => { Modal.close(); openTemplateForm(tpl); };
           root.querySelector('#dp-delete-template').onclick = async () => {
-            const ok = await Confirm.ask('Bu ders şablonu TÜM haftalardan kalıcı olarak silinecek. Bu işlem geri alınamaz.', { danger: true });
+            const ok = await Confirm.ask(
+              'Bu ders şablonu TÜM haftalardan silinecek. (Çöp Kutusu\'ndan geri alınabilir)',
+              { danger: true }
+            );
             if (!ok) return;
-            await Schedule.removeSlot(templateId);
+            // Şablona bağlı istisnaları da temizliyoruz, ama kalıcı silmek yerine diğer
+            // tüm türlerle (görev, not, belge vb.) aynı şekilde Çöp Kutusu'na taşıyoruz —
+            // geri yüklenince istisnalar da birlikte döner.
+            for (const ex of State.data.dersProgramiIstisna.filter((e) => e.templateId === templateId)) {
+              await Trash.moveToTrash('dersProgramiIstisna', ex, `Ders istisnası: ${Schedule.GUNLER[tpl.gun]} · ${ex.haftaBaslangicTarihi}`);
+            }
+            await Trash.moveToTrash('dersProgrami', tpl, `Ders: ${Schedule.GUNLER[tpl.gun]} ${tpl.baslangicSaati}-${tpl.bitisSaati} · ${tpl.sinif}`);
             Modal.close();
             renderWeek();
           };
@@ -709,9 +722,10 @@ const renderDersProgramiTab = {
       `).join('');
       container.querySelectorAll('.dp-ekders-delete').forEach((btn) => {
         btn.onclick = async () => {
-          const ok = await Confirm.ask('Bu ek ders saati silinsin mi?', { danger: true });
+          const ok = await Confirm.ask('Bu ek ders saati silinsin mi? (Çöp Kutusu\'ndan geri alınabilir)', { danger: true });
           if (!ok) return;
-          await Schedule.removeEkDers(btn.dataset.id);
+          const ek = State.data.ekDersSaatleri.find((e) => e.id === btn.dataset.id);
+          await Trash.moveToTrash('ekDersSaatleri', ek, `Ek ders: ${Utils.formatDateTR(ek.tarih)} · ${ek.baslangicSaati}-${ek.bitisSaati}`);
           renderWeek();
           renderEkDersList();
         };

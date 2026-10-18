@@ -18,7 +18,4 @@ const Notes = {
     return { ok: true, record };
   },
 
-  async remove(id) {
-    await State.remove('notes', id);
-  },
 };

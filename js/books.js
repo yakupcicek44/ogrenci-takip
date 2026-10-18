@@ -23,7 +23,4 @@ const Books = {
     return { ok: true, record };
   },
 
-  async remove(id) {
-    await State.remove('books', id);
-  },
 };

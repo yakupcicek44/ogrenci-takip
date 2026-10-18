@@ -58,10 +58,6 @@ const Documents = {
     return { ok: true };
   },
 
-  async remove(id) {
-    await State.remove('documents', id);
-  },
-
   filterByKategori(kategori) {
     const list = kategori ? State.data.documents.filter((d) => d.kategori === kategori) : State.data.documents;
     return [...list].sort((a, b) => (b.olusturmaTarihi || '').localeCompare(a.olusturmaTarihi || ''));

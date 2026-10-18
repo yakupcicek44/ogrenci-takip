@@ -35,7 +35,4 @@ const Observations = {
     return { ok: true, record };
   },
 
-  async remove(id) {
-    await State.remove('observations', id);
-  },
 };

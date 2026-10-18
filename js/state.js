@@ -173,12 +173,17 @@ const State = {
     return this.data.tasks.filter((t) => !t.ustGorevId);
   },
 
+  getStudentTasks(studentId) {
+    return this.data.tasks.filter((t) => t.studentId === studentId).sort((a, b) => (a.sonTarih || '').localeCompare(b.sonTarih || ''));
+  },
+
   getReminder(id) {
     return this.data.reminders.find((r) => r.id === id) || null;
   },
 
   getStudentReminders(studentId) {
-    return this.data.reminders.filter((r) => r.studentId === studentId);
+    return this.data.reminders.filter((r) => r.studentId === studentId)
+      .sort((a, b) => (a.tarih + (a.saat || '00:00')).localeCompare(b.tarih + (b.saat || '00:00')));
   },
 
   getNote(id) {

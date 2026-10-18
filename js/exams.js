@@ -21,10 +21,6 @@ const MockExams = {
     return { ok: true, record };
   },
 
-  async remove(id) {
-    await State.remove('mockExams', id);
-  },
-
   // Chart.js için sıralı veri (puan ve net trend)
   chartData(studentId) {
     const list = State.getStudentMockExams(studentId);

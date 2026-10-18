@@ -958,6 +958,26 @@ const renderGelisimTab = {
         <p class="muted">${hw.length ? `${tamamlanan} / ${hw.length} ödev teslim edildi.` : 'Ödev kaydı yok.'}</p>
       </div>
 
+      ${(() => {
+        // Asistan'da bu öğrenciyle ilişkilendirilmiş görev/hatırlatıcı/not — öğrencinin
+        // kendi sayfasından da görülebilsin, Asistan'ın tam listesinde aranmasın diye.
+        const gorevler = State.getStudentTasks(student.id).filter((t) => t.durum !== 'tamamlandi');
+        const hatirlaticilar = State.getStudentReminders(student.id).filter((r) => !r.tamamlandi);
+        const notlar = State.getStudentNotes(student.id);
+        if (!gorevler.length && !hatirlaticilar.length && !notlar.length) return '';
+        return `
+          <div class="card">
+            <div class="card-title">Asistan'da Bu Öğrenciyle İlişkili</div>
+            <ul class="simple-list">
+              ${gorevler.map((t) => `<li>✅ ${Utils.escapeHtml(t.baslik)}${t.sonTarih ? ' — ' + Utils.formatDateTR(t.sonTarih) : ''}</li>`).join('')}
+              ${hatirlaticilar.map((r) => `<li>⏰ ${Utils.escapeHtml(r.metin)} — ${Utils.formatDateTR(r.tarih)}${r.saat ? ' ' + r.saat : ''}</li>`).join('')}
+              ${notlar.map((n) => `<li>🗒️ ${Utils.escapeHtml(n.baslik || n.metin.slice(0, 40))}</li>`).join('')}
+            </ul>
+            <a href="#/asistan" class="btn btn-secondary btn-block" style="margin-top:8px;">Asistanı Aç</a>
+          </div>
+        `;
+      })()}
+
       <div class="card">
         <div class="card-title">Sınıf Geçmişi</div>
         ${sinifGecmisi.length ? `

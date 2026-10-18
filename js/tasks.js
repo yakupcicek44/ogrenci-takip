@@ -65,15 +65,10 @@ const Tasks = {
     base.setDate(base.getDate() + gun);
     await State.save('tasks', {
       ...task,
-      sonTarih: base.toISOString().slice(0, 10),
+      sonTarih: Utils.dateToISO(base),
       durum: 'ertelendi',
       ertelemeSayisi: (task.ertelemeSayisi || 0) + 1,
     });
-  },
-
-  async remove(id) {
-    for (const alt of State.getSubtasks(id)) await State.remove('tasks', alt.id);
-    await State.remove('tasks', id);
   },
 
   isOverdue(task) {

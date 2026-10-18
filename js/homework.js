@@ -105,13 +105,13 @@ const Homework = {
   },
 
   getUpcoming(days = 7) {
-    const now = new Date();
-    const limit = new Date();
-    limit.setDate(limit.getDate() + days);
-    return State.data.homeworkTasks.filter((t) => {
-      if (!t.teslimTarihi) return false;
-      const d = new Date(t.teslimTarihi);
-      return d >= now && d <= limit;
-    });
+    // Tarih-sadece dizge karşılaştırması kullanılıyor (Date nesnesine çevirmek, tarih-sadece
+    // bir dizgeyi UTC gece yarısı sayıp Türkiye'de günü 3 saat kaydırıyordu — bir ödev,
+    // teslim günü boyunca "yaklaşan" listesinden sabah 03:00'ten sonra düşüyordu).
+    const today = Utils.todayISO();
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() + days);
+    const limit = Utils.dateToISO(limitDate);
+    return State.data.homeworkTasks.filter((t) => t.teslimTarihi && t.teslimTarihi >= today && t.teslimTarihi <= limit);
   },
 };

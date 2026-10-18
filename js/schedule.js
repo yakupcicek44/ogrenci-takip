@@ -96,14 +96,6 @@ const Schedule = {
     return { ok: true };
   },
 
-  // Şablon silinince ona bağlı istisnalar da anlamsızlaşır, onları da temizler.
-  async removeSlot(id) {
-    for (const ex of State.data.dersProgramiIstisna.filter((e) => e.templateId === id)) {
-      await State.remove('dersProgramiIstisna', ex.id);
-    }
-    await State.remove('dersProgrami', id);
-  },
-
   // --- İstisna: bu haftaya özel iptal/değişiklik (şablonu kalıcı değiştirmez) ---
   getException(templateId, haftaBaslangicTarihi) {
     return State.data.dersProgramiIstisna.find((e) => e.templateId === templateId && e.haftaBaslangicTarihi === haftaBaslangicTarihi) || null;
@@ -186,10 +178,6 @@ const Schedule = {
     };
     await State.save('ekDersSaatleri', record);
     return { ok: true, record };
-  },
-
-  async removeEkDers(id) {
-    await State.remove('ekDersSaatleri', id);
   },
 
   getEkDersInRange(startIso, endIso) {

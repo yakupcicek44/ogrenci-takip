@@ -177,15 +177,6 @@ const DB = {
     });
   },
 
-  async getByIndex(storeName, indexName, value) {
-    const store = await tx(storeName);
-    return new Promise((resolve, reject) => {
-      const req = store.index(indexName).getAll(value);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  },
-
   async put(storeName, value) {
     const store = await tx(storeName, 'readwrite');
     return new Promise((resolve, reject) => {

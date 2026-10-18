@@ -33,11 +33,6 @@ const Reminders = {
     else Push.syncReminder(updated);
   },
 
-  async remove(id) {
-    await State.remove('reminders', id);
-    Push.deleteReminderSync(id);
-  },
-
   getToday() {
     const today = Utils.todayISO();
     return State.data.reminders
