@@ -401,7 +401,7 @@ textarea.input { resize: vertical; }
   justify-content: center;
   gap: 1px;
   padding: 6px 0;
-  margin: 1px;
+  margin: 0 0.5px;
   text-decoration: none;
   color: var(--muted);
   font-size: 9.5px;
@@ -410,9 +410,13 @@ textarea.input { resize: vertical; }
   transition: background 0.15s, color 0.15s;
   min-width: 0;
 }
-.nav-item.active { color: var(--primary); font-weight: 750; background: var(--primary-light); }
+.nav-item.active { color: var(--primary); font-weight: 700; background: var(--primary-light); }
 .nav-icon { font-size: 17px; line-height: 1; }
-.nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 0 1px; }
+/* En uzun etiket ("Öğrenciler") 7 öğeli alt gezinmede, özellikle aktif (kalın) haldeyken
+   taşıp "Öğrenci..." şeklinde kesiliyordu — gerçek bir telefon ekran görüntüsüyle
+   doğrulandı. Yazı tipini biraz küçültüp harf aralığını daraltarak düzeltildi,
+   text-overflow:ellipsis yine de bir güvenlik ağı olarak duruyor. */
+.nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 0 1px; font-size: 9px; letter-spacing: -0.2px; }
 
 /* Modal */
 @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
