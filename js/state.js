@@ -4,6 +4,7 @@ const State = {
   data: {
     students: [],
     terms: [],
+    dersler: [],
     assessments: [],
     homeworkTasks: [],
     homeworkAssignments: [],
@@ -30,6 +31,7 @@ const State = {
     const d = this.data;
     d.students = await DB.getAll('students');
     d.terms = await DB.getAll('terms');
+    d.dersler = await DB.getAll('dersler');
     d.assessments = await DB.getAll('assessments');
     d.homeworkTasks = await DB.getAll('homeworkTasks');
     d.homeworkAssignments = await DB.getAll('homeworkAssignments');
@@ -56,6 +58,15 @@ const State = {
       await DB.put('terms', t1);
       await DB.put('terms', t2);
       d.terms = [t1, t2];
+    }
+
+    // Aynı sınıfa birden fazla ders verilebildiği için her ders ayrı not takibi
+    // yapabiliyor (bkz. Assessments). Hiç ders yoksa (ilk kurulum) tek bir varsayılan
+    // ders oluşturulur — Ayarlar'dan istenirse yeniden adlandırılır/yenileri eklenir.
+    if (!d.dersler.length) {
+      const ders1 = { id: Utils.uid(), ad: 'Felsefe', olusturmaTarihi: new Date().toISOString() };
+      await DB.put('dersler', ders1);
+      d.dersler = [ders1];
     }
 
     if (!d.settings) {
@@ -116,8 +127,18 @@ const State = {
     return explicit || sorted[sorted.length - 1];
   },
 
-  getStudentAssessments(studentId, termId) {
-    return this.data.assessments.filter((a) => a.studentId === studentId && a.termId === termId);
+  getDersSorted() {
+    return [...this.data.dersler].sort((a, b) => (a.olusturmaTarihi || '').localeCompare(b.olusturmaTarihi || ''));
+  },
+
+  // Ayarlar'dan elle seçilen "aktif" ders; seçilmemişse en son eklenen ders varsayılır.
+  // Tek dersli öğretmenler için zaten tek seçenek var, hiçbir şey değişmez.
+  getActiveCourse() {
+    const sorted = this.getDersSorted();
+    if (!sorted.length) return null;
+    const explicitId = this.data.settings?.aktifDersId;
+    const explicit = explicitId ? sorted.find((d) => d.id === explicitId) : null;
+    return explicit || sorted[sorted.length - 1];
   },
 
   getStudentHomework(studentId) {

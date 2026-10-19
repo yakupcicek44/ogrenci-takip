@@ -1,6 +1,6 @@
 // IndexedDB katmanı — tüm kalıcı veri burada tutulur (geçici bellek kullanılmaz)
 const DB_NAME = 'ogrenci-takip-db';
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 
 let dbInstance = null;
 
@@ -121,6 +121,13 @@ function openDB() {
         db.createObjectStore('chatMesajlari', { keyPath: 'id' });
       }
 
+      // Ders/Branş — öğretmen aynı sınıfa birden fazla ders verebiliyor (örn. Felsefe
+      // + Seçmeli Felsefe). Her ders için ayrı not takibi yapılabilsin diye assessments
+      // artık dersId taşıyor (aşağıdaki v9->v10 geçişine bakınız).
+      if (!db.objectStoreNames.contains('dersler')) {
+        db.createObjectStore('dersler', { keyPath: 'id' });
+      }
+
       // v2 -> v3: eski tek metinlik "gozlemNotlari" alanını kaybetmemek için
       // mevcut öğrencilerin notunu ilk gözlem günlüğü kaydına taşıyoruz.
       if (e.oldVersion < 3) {
@@ -140,6 +147,27 @@ function openDB() {
               metin: student.gozlemNotlari,
               beceriEtiketi: '',
             });
+          }
+          cursor.continue();
+        };
+      }
+
+      // v9 -> v10: assessments artık dersId taşıyor. Var olan TÜM notlar veri kaybı
+      // olmadan "Felsefe" adlı varsayılan bir derse taşınır (bu projenin tek bilinen
+      // gerçek kullanıcısı felsefe öğretmeni Yakup) — Ayarlar'dan istenirse yeniden
+      // adlandırılabilir. Yeni kurulumlarda (oldVersion 0) bu blok atlanır, varsayılan
+      // ders State.init()'te oluşturulur (bkz. state.js).
+      if (e.oldVersion > 0 && e.oldVersion < 10) {
+        const tr = e.target.transaction;
+        const assessmentsStore = tr.objectStore('assessments');
+        const dersStore = tr.objectStore('dersler');
+        const defaultDersId = 'ders_varsayilan_felsefe';
+        dersStore.put({ id: defaultDersId, ad: 'Felsefe', olusturmaTarihi: new Date().toISOString() });
+        assessmentsStore.openCursor().onsuccess = (ev) => {
+          const cursor = ev.target.result;
+          if (!cursor) return;
+          if (!cursor.value.dersId) {
+            cursor.update({ ...cursor.value, dersId: defaultDersId });
           }
           cursor.continue();
         };
@@ -216,7 +244,7 @@ const DB = {
 
   // Tüm store'ları tek bir nesnede döndürür (JSON yedekleme için)
   async exportAll() {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'chatMesajlari', 'settings'];
+    const names = ['students', 'terms', 'dersler', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'chatMesajlari', 'settings'];
     const result = {};
     for (const n of names) {
       result[n] = await DB.getAll(n);
@@ -226,7 +254,7 @@ const DB = {
 
   // JSON yedekten tüm store'ları geri yükler (önce temizler, sonra yazar)
   async importAll(data) {
-    const names = ['students', 'terms', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'chatMesajlari', 'settings'];
+    const names = ['students', 'terms', 'dersler', 'assessments', 'homeworkTasks', 'homeworkAssignments', 'books', 'mockExams', 'scans', 'observations', 'tasks', 'reminders', 'notes', 'attendance', 'documents', 'trash', 'dersProgrami', 'dersProgramiIstisna', 'ekDersSaatleri', 'chatMesajlari', 'settings'];
     for (const n of names) {
       await DB.clear(n);
       if (Array.isArray(data[n]) && data[n].length) {

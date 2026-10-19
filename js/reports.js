@@ -53,32 +53,35 @@ const Reports = {
     const ensureSpace = (limit) => { if (y > limit) { doc.addPage(); y = 40; } };
 
     if (opt.assessments) {
-      y = this._sectionTitle(doc, 'Sınav ve Performans Ödevi', y + 6);
       const terms = State.getTermsSorted();
-      const rows = [];
-      for (const term of terms) {
-        for (const slotDef of Assessments.SLOTS) {
-          const rec = Assessments.getSlotRecord(studentId, term.id, slotDef.key);
-          rows.push([
-            term.ad,
-            slotDef.etiket,
-            rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '-',
-            rec && rec.tarih ? Utils.formatDateTR(rec.tarih) : '-',
-            rec && rec.aciklama ? rec.aciklama : '',
-          ]);
+      const dersler = State.getDersSorted();
+      for (const ders of dersler) {
+        y = this._sectionTitle(doc, dersler.length > 1 ? `Sınav ve Performans Ödevi — ${ders.ad}` : 'Sınav ve Performans Ödevi', y + 6);
+        const rows = [];
+        for (const term of terms) {
+          for (const slotDef of Assessments.SLOTS) {
+            const rec = Assessments.getSlotRecord(studentId, term.id, ders.id, slotDef.key);
+            rows.push([
+              term.ad,
+              slotDef.etiket,
+              rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '-',
+              rec && rec.tarih ? Utils.formatDateTR(rec.tarih) : '-',
+              rec && rec.aciklama ? rec.aciklama : '',
+            ]);
+          }
+          const ort = Assessments.calcTermAverage(studentId, term.id, ders.id);
+          rows.push([term.ad, 'Dönem Ortalaması', ort !== null ? ort : '-', '', '']);
         }
-        const ort = Assessments.calcTermAverage(studentId, term.id);
-        rows.push([term.ad, 'Dönem Ortalaması', ort !== null ? ort : '-', '', '']);
+        doc.autoTable({
+          startY: y,
+          head: [['Dönem', 'Değerlendirme', 'Not', 'Tarih', 'Açıklama']],
+          body: rows,
+          styles: { font: 'Lato', fontSize: 9 },
+          headStyles: { font: 'Lato', fontStyle: 'bold', fillColor: [37, 99, 235] },
+          margin: { left: 40, right: 40 },
+        });
+        y = doc.lastAutoTable.finalY + 20;
       }
-      doc.autoTable({
-        startY: y,
-        head: [['Dönem', 'Değerlendirme', 'Not', 'Tarih', 'Açıklama']],
-        body: rows,
-        styles: { font: 'Lato', fontSize: 9 },
-        headStyles: { font: 'Lato', fontStyle: 'bold', fillColor: [37, 99, 235] },
-        margin: { left: 40, right: 40 },
-      });
-      y = doc.lastAutoTable.finalY + 20;
     }
 
     if (opt.attendance) {
@@ -178,9 +181,9 @@ const Reports = {
 
   DEFAULT_CLASS_SECTIONS: { grades: true, ranking: true, attendance: false, homework: false, books: false, exams: false, observations: false },
 
-  _classTableSpec(sinif, termId, sections) {
+  _classTableSpec(sinif, termId, sections, dersId) {
     const opt = { ...this.DEFAULT_CLASS_SECTIONS, ...(sections || {}) };
-    const ranking = Assessments.rankInClass(sinif, termId);
+    const ranking = Assessments.rankInClass(sinif, termId, dersId);
     const head = ['Ad Soyad', 'Okul No'];
     if (opt.grades) head.push('1.Sınav', '2.Sınav', '1.Perf.', '2.Perf.', 'Ortalama');
     if (opt.ranking) head.push('Sıra');
@@ -195,7 +198,7 @@ const Reports = {
       if (opt.grades) {
         row.push(
           ...Assessments.SLOTS.map((s) => {
-            const rec = Assessments.getSlotRecord(r.student.id, termId, s.key);
+            const rec = Assessments.getSlotRecord(r.student.id, termId, dersId, s.key);
             return rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '-';
           }),
           r.average !== null ? r.average : '-'
@@ -228,11 +231,12 @@ const Reports = {
     return { head, rows };
   },
 
-  classPDF(sinif, termId, sections) {
+  classPDF(sinif, termId, sections, dersId) {
     const term = State.data.terms.find((t) => t.id === termId);
+    const ders = State.data.dersler.find((d) => d.id === dersId);
     const doc = this._newDoc();
-    let y = this._header(doc, `Sınıf Raporu — ${sinif} (${term ? term.ad : ''})`);
-    const { head, rows } = this._classTableSpec(sinif, termId, sections);
+    let y = this._header(doc, `Sınıf Raporu — ${sinif} (${term ? term.ad : ''}${ders && State.data.dersler.length > 1 ? ' — ' + ders.ad : ''})`);
+    const { head, rows } = this._classTableSpec(sinif, termId, sections, dersId);
 
     doc.autoTable({
       startY: y,
@@ -270,15 +274,19 @@ const Reports = {
 
     if (opt.assessments) {
       const terms = State.getTermsSorted();
-      const notRows = [['Dönem', 'Değerlendirme', 'Not', 'Tarih', 'Açıklama']];
-      for (const term of terms) {
-        for (const slotDef of Assessments.SLOTS) {
-          const rec = Assessments.getSlotRecord(studentId, term.id, slotDef.key);
-          notRows.push([term.ad, slotDef.etiket, rec ? rec.puan : null, rec ? rec.tarih : '', rec ? rec.aciklama : '']);
+      const dersler = State.getDersSorted();
+      for (const ders of dersler) {
+        const notRows = [['Dönem', 'Değerlendirme', 'Not', 'Tarih', 'Açıklama']];
+        for (const term of terms) {
+          for (const slotDef of Assessments.SLOTS) {
+            const rec = Assessments.getSlotRecord(studentId, term.id, ders.id, slotDef.key);
+            notRows.push([term.ad, slotDef.etiket, rec ? rec.puan : null, rec ? rec.tarih : '', rec ? rec.aciklama : '']);
+          }
+          notRows.push([term.ad, 'Dönem Ortalaması', Assessments.calcTermAverage(studentId, term.id, ders.id), '', '']);
         }
-        notRows.push([term.ad, 'Dönem Ortalaması', Assessments.calcTermAverage(studentId, term.id), '', '']);
+        const sheetName = dersler.length > 1 ? `Sınav-${ders.ad}`.replace(/[:\\/?*[\]]/g, '-').slice(0, 31) : 'Sınav-Performans';
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(notRows), sheetName);
       }
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(notRows), 'Sınav-Performans');
     }
 
     if (opt.attendance) {
@@ -315,9 +323,9 @@ const Reports = {
     XLSX.writeFile(wb, `${this._safeFilePart(student.ad)}_rapor.xlsx`);
   },
 
-  classExcel(sinif, termId, sections) {
+  classExcel(sinif, termId, sections, dersId) {
     const term = State.data.terms.find((t) => t.id === termId);
-    const { head, rows: bodyRows } = this._classTableSpec(sinif, termId, sections);
+    const { head, rows: bodyRows } = this._classTableSpec(sinif, termId, sections, dersId);
     const rows = [head, ...bodyRows];
     const wb = XLSX.utils.book_new();
     // Excel sayfa adlarında : \ / ? * [ ] YASAK — Türkiye'de sınıf adları genelde
@@ -362,23 +370,26 @@ const Reports = {
     doc.setTextColor(0);
     y += 24;
 
-    y = this._sectionTitle(doc, 'Sınav ve Performans Notları', y);
-    const notRows = Assessments.SLOTS.map((slotDef) => {
-      const rec = Assessments.getSlotRecord(studentId, termId, slotDef.key);
-      return [slotDef.etiket, rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '-'];
-    });
-    const ortalama = Assessments.calcTermAverage(studentId, termId);
-    const ranking = Assessments.rankInClass(student.sinif, termId);
-    const kendiSira = ranking.find((r) => r.student.id === studentId);
-    doc.autoTable({
-      startY: y,
-      head: [['Değerlendirme', 'Not']],
-      body: [...notRows, ['Dönem Ortalaması', ortalama !== null ? ortalama : '-'], ['Sınıf İçi Sıralama', kendiSira ? `${kendiSira.rank} / ${ranking.length}` : '-']],
-      styles: { font: 'Lato', fontSize: 9 },
-      headStyles: { font: 'Lato', fontStyle: 'bold', fillColor: [37, 99, 235] },
-      margin: { left: 40, right: 40 },
-    });
-    y = doc.lastAutoTable.finalY + 20;
+    const dersler = State.getDersSorted();
+    for (const ders of dersler) {
+      y = this._sectionTitle(doc, dersler.length > 1 ? `Sınav ve Performans Notları — ${ders.ad}` : 'Sınav ve Performans Notları', y);
+      const notRows = Assessments.SLOTS.map((slotDef) => {
+        const rec = Assessments.getSlotRecord(studentId, termId, ders.id, slotDef.key);
+        return [slotDef.etiket, rec && !Utils.isEmptyGrade(rec.puan) ? rec.puan : '-'];
+      });
+      const ortalama = Assessments.calcTermAverage(studentId, termId, ders.id);
+      const ranking = Assessments.rankInClass(student.sinif, termId, ders.id);
+      const kendiSira = ranking.find((r) => r.student.id === studentId);
+      doc.autoTable({
+        startY: y,
+        head: [['Değerlendirme', 'Not']],
+        body: [...notRows, ['Dönem Ortalaması', ortalama !== null ? ortalama : '-'], ['Sınıf İçi Sıralama', kendiSira ? `${kendiSira.rank} / ${ranking.length}` : '-']],
+        styles: { font: 'Lato', fontSize: 9 },
+        headStyles: { font: 'Lato', fontStyle: 'bold', fillColor: [37, 99, 235] },
+        margin: { left: 40, right: 40 },
+      });
+      y = doc.lastAutoTable.finalY + 20;
+    }
 
     const attSummary = Attendance.getStudentSummary(studentId, range);
     y = this._sectionTitle(doc, 'Devamsızlık' + (araligBelirsiz ? ' (tüm zamanlar)' : ''), y);

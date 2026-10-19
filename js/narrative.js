@@ -6,9 +6,10 @@ const Narrative = {
     const student = State.getStudent(studentId);
     const term = State.data.terms.find((t) => t.id === termId);
     const range = { baslangic: term?.baslangicTarihi, bitis: term?.bitisTarihi };
+    const ders = State.getActiveCourse();
 
-    const ortalama = Assessments.calcTermAverage(studentId, termId);
-    const ranking = Assessments.rankInClass(student.sinif, termId);
+    const ortalama = Assessments.calcTermAverage(studentId, termId, ders?.id);
+    const ranking = Assessments.rankInClass(student.sinif, termId, ders?.id);
     const kendiSira = ranking.find((r) => r.student.id === studentId);
     const att = Attendance.getStudentSummary(studentId, range);
     const hw = State.getStudentHomeworkInRange(studentId, range);
@@ -16,7 +17,7 @@ const Narrative = {
     const obs = State.getStudentObservationsInRange(studentId, range).filter((o) => o.tur !== 'degerlendirme');
 
     const parts = [
-      `Ad: ${student.ad}, Sınıf: ${student.sinif}, Dönem: ${term?.ad || ''}`,
+      `Ad: ${student.ad}, Sınıf: ${student.sinif}, Dönem: ${term?.ad || ''}${State.data.dersler.length > 1 ? `, Ders: ${ders?.ad || ''}` : ''}`,
       `Dönem ortalaması: ${ortalama !== null ? ortalama : 'girilmedi'}${kendiSira ? `, sınıf sıralaması: ${kendiSira.rank}/${ranking.length}` : ''}`,
       att.toplam ? `Devamsızlık: ${att.toplam} gün kayıtlı, ${att.yok} gün yok, devamsızlık oranı %${att.devamsizlikOrani}` : 'Devamsızlık kaydı yok.',
       hw.length ? `Ödev tamamlama: ${hwTamamlanan}/${hw.length}` : 'Ödev kaydı yok.',

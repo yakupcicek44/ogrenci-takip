@@ -4,6 +4,8 @@ const SettingsView = {
     const w = State.data.settings.agirliklar;
     const terms = State.getTermsSorted();
     const aktifDonem = State.getActiveTerm();
+    const dersler = State.getDersSorted();
+    const aktifDers = State.getActiveCourse();
     const sonYedek = State.data.settings.sonYedekTarihi;
 
     return pageWrap('Ayarlar', `
@@ -18,6 +20,7 @@ const SettingsView = {
         <div class="kv-row"><span>Yoklama Kaydı</span><strong>${State.data.attendance.length}</strong></div>
         <div class="kv-row"><span>Görev / Hatırlatıcı / Not</span><strong>${State.data.tasks.length} / ${State.data.reminders.length} / ${State.data.notes.length}</strong></div>
         <div class="kv-row"><span>Aktif Dönem</span><strong>${Utils.escapeHtml(aktifDonem?.ad || '-')}</strong></div>
+        ${dersler.length > 1 ? `<div class="kv-row"><span>Aktif Ders</span><strong>${Utils.escapeHtml(aktifDers?.ad || '-')} (${dersler.length} ders tanımlı)</strong></div>` : ''}
         <div class="kv-row"><span>Taranan Kağıt (AI)</span><strong>${State.data.scans.length}</strong></div>
         <div class="kv-row"><span>Belgeler</span><strong>${State.data.documents.length}</strong></div>
         <div class="kv-row"><span>Çöp Kutusu</span><strong>${State.data.trash.length}</strong></div>
@@ -72,6 +75,26 @@ const SettingsView = {
           }).join('')}
         </div>
         <button class="btn btn-secondary btn-block" id="add-term">+ Dönem Ekle</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Dersler</div>
+        <p class="muted small">Aynı sınıfa birden fazla ders veriyorsan (örn. Felsefe + Seçmeli Felsefe), her ders için ayrı not takibi yapabilmek üzere burada ekleyebilirsin. Tek ders varken öğrenci/rapor ekranlarında hiçbir şey değişmez — ders seçimi sadece birden fazla ders olunca görünür.</p>
+        <div class="list" id="ders-list">
+          ${dersler.map((d) => {
+            const aktif = d.id === aktifDers?.id;
+            return `
+              <div class="list-item" data-id="${d.id}">
+                <div class="list-item-main"><div class="list-item-title">${Utils.escapeHtml(d.ad)}${aktif ? ' <span class="badge">Aktif</span>' : ''}</div></div>
+                <div style="display:flex;gap:6px;">
+                  ${!aktif && dersler.length > 1 ? `<button class="btn btn-secondary btn-sm set-active-ders" data-id="${d.id}">Aktif Yap</button>` : ''}
+                  <button class="btn btn-secondary btn-sm edit-ders" data-id="${d.id}">Düzenle</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <button class="btn btn-secondary btn-block" id="add-ders">+ Ders Ekle</button>
       </div>
 
       <div class="card">
@@ -346,6 +369,64 @@ const SettingsView = {
     document.getElementById('add-term').addEventListener('click', () => openTermForm(null));
     document.querySelectorAll('.edit-term').forEach((btn) => {
       btn.addEventListener('click', () => openTermForm(State.data.terms.find((t) => t.id === btn.dataset.id)));
+    });
+
+    document.querySelectorAll('.set-active-ders').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await State.save('settings', { ...State.data.settings, aktifDersId: btn.dataset.id });
+        Utils.toast('Aktif ders güncellendi.', 'success');
+        Router.render();
+      });
+    });
+
+    const openDersForm = (ders) => {
+      Modal.open(`
+        <div class="modal-header">${ders ? 'Dersi Düzenle' : 'Yeni Ders'}</div>
+        <div class="modal-body">
+          <label class="field-label">Ders Adı *</label>
+          <input type="text" id="ders-ad" class="input" value="${Utils.escapeHtml(ders?.ad || '')}">
+        </div>
+        <div class="modal-actions">
+          ${ders ? '<button class="btn btn-danger" id="ders-delete">Sil</button>' : ''}
+          <button class="btn btn-secondary" id="ders-cancel">Vazgeç</button>
+          <button class="btn btn-primary" id="ders-save">Kaydet</button>
+        </div>
+      `, {
+        onMount: (root) => {
+          root.querySelector('#ders-cancel').onclick = () => Modal.close();
+          if (ders) {
+            root.querySelector('#ders-delete').onclick = async () => {
+              if (State.data.dersler.length <= 1) {
+                Utils.toast('En az bir ders olmalı — bu tek dersi silemezsin.', 'info');
+                return;
+              }
+              const notSayisi = Dersler.countAssessments(ders.id);
+              const ok = await Confirm.ask(
+                notSayisi
+                  ? `Bu ders silinirse, bu derse ait ${notSayisi} sınav/performans notu da kalıcı olarak silinir. Devam edilsin mi?`
+                  : 'Bu ders silinsin mi?',
+                { danger: true }
+              );
+              if (!ok) return;
+              await Dersler.remove(ders.id);
+              Modal.close();
+              Router.render();
+            };
+          }
+          root.querySelector('#ders-save').onclick = async () => {
+            const ad = root.querySelector('#ders-ad').value;
+            const result = ders ? await Dersler.rename(ders.id, ad) : await Dersler.create(ad);
+            if (!result.ok) { Utils.toast(result.errors.join(' '), 'error'); return; }
+            Modal.close();
+            Router.render();
+          };
+        },
+      });
+    };
+
+    document.getElementById('add-ders').addEventListener('click', () => openDersForm(null));
+    document.querySelectorAll('.edit-ders').forEach((btn) => {
+      btn.addEventListener('click', () => openDersForm(State.data.dersler.find((d) => d.id === btn.dataset.id)));
     });
 
     document.getElementById('backup-export').addEventListener('click', async () => {

@@ -411,11 +411,22 @@ const renderGenelTab = {
 const renderSinavTab = {
   html(student) {
     const terms = State.getTermsSorted();
+    const activeTerm = State.getActiveTerm();
+    const dersler = State.getDersSorted();
+    const activeDers = State.getActiveCourse();
     return `
+      ${dersler.length > 1 ? `
+        <div class="field-inline">
+          <label>Ders:</label>
+          <select id="sinav-ders-select" class="input">
+            ${dersler.map((d) => `<option value="${d.id}" ${d.id === activeDers?.id ? 'selected' : ''}>${Utils.escapeHtml(d.ad)}</option>`).join('')}
+          </select>
+        </div>
+      ` : ''}
       <div class="field-inline">
         <label>Dönem:</label>
         <select id="sinav-term-select" class="input">
-          ${terms.map((t) => `<option value="${t.id}">${Utils.escapeHtml(t.ad)}</option>`).join('')}
+          ${terms.map((t) => `<option value="${t.id}" ${t.id === activeTerm?.id ? 'selected' : ''}>${Utils.escapeHtml(t.ad)}</option>`).join('')}
         </select>
       </div>
       <div id="sinav-table-container"></div>
@@ -423,14 +434,17 @@ const renderSinavTab = {
   },
   mount(student) {
     const select = document.getElementById('sinav-term-select');
+    const dersSelect = document.getElementById('sinav-ders-select');
+    const getDersId = () => dersSelect ? dersSelect.value : State.getActiveCourse()?.id;
     const renderTable = () => {
       const termId = select.value;
+      const dersId = getDersId();
       const container = document.getElementById('sinav-table-container');
-      const ortalama = Assessments.calcTermAverage(student.id, termId);
+      const ortalama = Assessments.calcTermAverage(student.id, termId, dersId);
       container.innerHTML = `
         <div class="list">
           ${Assessments.SLOTS.map((slotDef) => {
-            const rec = Assessments.getSlotRecord(student.id, termId, slotDef.key);
+            const rec = Assessments.getSlotRecord(student.id, termId, dersId, slotDef.key);
             return `
               <div class="list-item" data-slot="${slotDef.key}">
                 <div class="list-item-main">
@@ -455,7 +469,7 @@ const renderSinavTab = {
         btn.onclick = () => {
           const slotKey = btn.dataset.slot;
           const slotDef = Assessments.SLOTS.find((s) => s.key === slotKey);
-          const rec = Assessments.getSlotRecord(student.id, termId, slotKey);
+          const rec = Assessments.getSlotRecord(student.id, termId, dersId, slotKey);
           Modal.open(`
             <div class="modal-header">${slotDef.etiket}</div>
             <div class="modal-body">
@@ -475,7 +489,7 @@ const renderSinavTab = {
             onMount: (root) => {
               root.querySelector('#s-cancel').onclick = () => Modal.close();
               root.querySelector('#s-save').onclick = async () => {
-                await Assessments.saveSlot(student.id, termId, slotKey, {
+                await Assessments.saveSlot(student.id, termId, dersId, slotKey, {
                   puan: root.querySelector('#s-puan').value,
                   tarih: root.querySelector('#s-tarih').value,
                   aciklama: root.querySelector('#s-aciklama').value,
@@ -488,11 +502,11 @@ const renderSinavTab = {
                 ScanFlow.start({
                   studentId: student.id,
                   ownerType: 'assessmentSlot',
-                  ownerId: `${termId}:${slotKey}`,
+                  ownerId: `${dersId}:${termId}:${slotKey}`,
                   context: `${slotDef.etiket} — ${student.ad}`,
                   onApprove: async (puan, metin) => {
-                    const current = Assessments.getSlotRecord(student.id, termId, slotKey);
-                    await Assessments.saveSlot(student.id, termId, slotKey, {
+                    const current = Assessments.getSlotRecord(student.id, termId, dersId, slotKey);
+                    await Assessments.saveSlot(student.id, termId, dersId, slotKey, {
                       puan: puan,
                       tarih: current?.tarih || Utils.todayISO(),
                       aciklama: (current?.aciklama ? current.aciklama + '\n\n' : '') + metin,
@@ -507,6 +521,7 @@ const renderSinavTab = {
       });
     };
     select.addEventListener('change', renderTable);
+    if (dersSelect) dersSelect.addEventListener('change', renderTable);
     renderTable();
   },
 };
@@ -941,17 +956,21 @@ const renderGelisimTab = {
     const hw = State.getStudentHomework(student.id);
     const tamamlanan = hw.filter((a) => a.durum === 'teslim edildi').length;
 
+    const dersler = State.getDersSorted();
+
     return `
-      <div class="card">
-        <div class="card-title">Dönem Ortalamaları</div>
-        <div class="list">
-          ${terms.map((t) => {
-            const ort = Assessments.calcTermAverage(student.id, t.id);
-            return `<div class="kv-row"><span>${Utils.escapeHtml(t.ad)}</span><strong>${ort !== null ? ort : '-'}</strong></div>`;
-          }).join('')}
-          <div class="kv-row"><span>Genel Ortalama</span><strong>${Assessments.calcOverallAverage(student.id) ?? '-'}</strong></div>
+      ${dersler.map((ders) => `
+        <div class="card">
+          <div class="card-title">${dersler.length > 1 ? `Dönem Ortalamaları — ${Utils.escapeHtml(ders.ad)}` : 'Dönem Ortalamaları'}</div>
+          <div class="list">
+            ${terms.map((t) => {
+              const ort = Assessments.calcTermAverage(student.id, t.id, ders.id);
+              return `<div class="kv-row"><span>${Utils.escapeHtml(t.ad)}</span><strong>${ort !== null ? ort : '-'}</strong></div>`;
+            }).join('')}
+            <div class="kv-row"><span>Genel Ortalama</span><strong>${Assessments.calcOverallAverage(student.id, ders.id) ?? '-'}</strong></div>
+          </div>
         </div>
-      </div>
+      `).join('')}
 
       <div class="card">
         <div class="card-title">Ödev Tamamlama</div>

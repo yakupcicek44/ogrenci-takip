@@ -116,7 +116,7 @@ const DashboardView = {
 
       ${siniflar.length && aktifDonem ? `
         <div class="card">
-          <div class="card-title">Sınıf Ortalamaları (${Utils.escapeHtml(aktifDonem.ad)})</div>
+          <div class="card-title">Sınıf Ortalamaları (${Utils.escapeHtml(aktifDonem.ad)}${State.data.dersler.length > 1 ? ' — ' + Utils.escapeHtml(State.getActiveCourse().ad) : ''})</div>
           <canvas id="chart-sinif-ortalama" height="180"></canvas>
         </div>
       ` : ''}
@@ -226,7 +226,8 @@ const DashboardView = {
     if (ortalamaCanvas) {
       const siniflar = State.getSiniflar();
       const aktifDonem = State.getActiveTerm();
-      const ortalamalar = siniflar.map((s) => Assessments.classAverage(s, aktifDonem.id));
+      const aktifDers = State.getActiveCourse();
+      const ortalamalar = siniflar.map((s) => Assessments.classAverage(s, aktifDonem.id, aktifDers?.id));
       new Chart(ortalamaCanvas, {
         type: 'bar',
         data: {
