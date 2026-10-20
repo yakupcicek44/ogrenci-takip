@@ -76,7 +76,7 @@ const Assessments = {
     }));
 
     withAvg.sort((a, b) => {
-      if (a.average === null && b.average === null) return a.student.ad.localeCompare(b.student.ad, 'tr');
+      if (a.average === null && b.average === null) return a.student.okulNo.localeCompare(b.student.okulNo, 'tr', { numeric: true });
       if (a.average === null) return 1;
       if (b.average === null) return -1;
       return b.average - a.average;

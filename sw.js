@@ -1,6 +1,6 @@
 // Service Worker — çevrimdışı çalışma için uygulama kabuğunu ve kütüphaneleri önbelleğe alır.
 // Veri (öğrenci kayıtları vb.) burada DEĞİL, cihazdaki IndexedDB'de tutulur.
-const CACHE_NAME = 'ogrenci-takip-v22';
+const CACHE_NAME = 'ogrenci-takip-v23';
 
 const PRECACHE_URLS = [
   './',
@@ -52,6 +52,7 @@ const PRECACHE_URLS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-512-maskable.png',
+  './icons/logo-full.png',
 ];
 
 self.addEventListener('install', (event) => {

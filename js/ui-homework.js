@@ -50,9 +50,10 @@ const HomeworkView = {
 
     const renderStudentCheckboxes = () => {
       const selectedSiniflar = [...document.querySelectorAll('.new-hw-sinif-checkbox:checked')].map((cb) => cb.value);
-      const students = selectedSiniflar.length
+      const students = (selectedSiniflar.length
         ? State.getActiveStudents().filter((s) => selectedSiniflar.includes(s.sinif))
-        : State.getActiveStudents();
+        : State.getActiveStudents()
+      ).sort((a, b) => a.okulNo.localeCompare(b.okulNo, 'tr', { numeric: true }));
       const container = document.getElementById('new-hw-student-list');
       container.innerHTML = students.map((s) => `
         <label class="checkbox-row">

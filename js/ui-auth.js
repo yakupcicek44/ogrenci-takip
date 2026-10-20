@@ -4,7 +4,8 @@ const LoginView = {
     if (!Auth.isSetup()) {
       return `
         <div class="page">
-          <div class="page-content" style="padding-top:60px;">
+          <div class="page-content" style="padding-top:40px;">
+            <img src="./icons/logo-full.png" alt="Öğrenci Takip Sistemi" style="display:block; width:100%; max-width:220px; margin:0 auto 24px;">
             <div class="card">
               <div class="card-title">Hoş Geldin — İlk Kurulum</div>
               <p class="muted small">
@@ -28,7 +29,8 @@ const LoginView = {
     }
     return `
       <div class="page">
-        <div class="page-content" style="padding-top:80px;">
+        <div class="page-content" style="padding-top:50px;">
+          <img src="./icons/logo-full.png" alt="Öğrenci Takip Sistemi" style="display:block; width:100%; max-width:220px; margin:0 auto 24px;">
           <div class="card">
             <div class="card-title">Giriş Yap</div>
             <label class="field-label">Kullanıcı Adı</label>

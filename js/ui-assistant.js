@@ -33,7 +33,7 @@ const AssistantView = {
 // ---- Görevler ----
 const renderGorevlerTab = {
   html() {
-    const students = [...State.data.students].sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+    const students = [...State.data.students].sort((a, b) => a.okulNo.localeCompare(b.okulNo, 'tr', { numeric: true }));
     return `
       <div class="card">
         <div class="card-title">Yeni Görev</div>
@@ -204,7 +204,7 @@ const renderGorevlerTab = {
 // ---- Hatırlatıcılar ----
 const renderHatirlaticilarTab = {
   html() {
-    const students = [...State.data.students].sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+    const students = [...State.data.students].sort((a, b) => a.okulNo.localeCompare(b.okulNo, 'tr', { numeric: true }));
     return `
       <div class="card" id="push-card">
         <div class="card-title">Bildirimler</div>

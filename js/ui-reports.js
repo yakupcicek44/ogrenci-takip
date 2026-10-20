@@ -1,7 +1,7 @@
 // Raporlar — öğrenci bazlı ve sınıf bazlı PDF/Excel çıktıları
 const ReportsView = {
   html() {
-    const students = [...State.data.students].sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+    const students = [...State.data.students].sort((a, b) => a.okulNo.localeCompare(b.okulNo, 'tr', { numeric: true }));
     const siniflar = State.getSiniflar();
     const terms = State.getTermsSorted();
     const aktifDonem = State.getActiveTerm();
@@ -197,7 +197,7 @@ const ReportsView = {
       const termId = document.getElementById('bulk-term').value;
       const dersId = getBulkDersId();
       if (!sinif || !termId) return;
-      const students = State.getActiveStudents().filter((s) => s.sinif === sinif).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+      const students = State.getActiveStudents().filter((s) => s.sinif === sinif).sort((a, b) => a.okulNo.localeCompare(b.okulNo, 'tr', { numeric: true }));
       const rows = [['Ad Soyad', 'Okul No', '1. Sınav', '2. Sınav', '1. Performans Ödevi', '2. Performans Ödevi']];
       for (const s of students) {
         rows.push([

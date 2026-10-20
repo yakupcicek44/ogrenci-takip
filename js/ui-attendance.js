@@ -26,7 +26,7 @@ const AttendanceView = {
       const container = document.getElementById('att-list');
       if (!sinif) { container.innerHTML = emptyState('Önce bir sınıf seç.', '🗓️'); return; }
 
-      const students = State.getActiveStudents().filter((s) => s.sinif === sinif).sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+      const students = State.getActiveStudents().filter((s) => s.sinif === sinif).sort((a, b) => a.okulNo.localeCompare(b.okulNo, 'tr', { numeric: true }));
       if (!students.length) { container.innerHTML = emptyState('Bu sınıfta öğrenci yok.', '🗓️'); return; }
 
       // Her öğrenci varsayılan olarak "var" işaretli gelir — öğretmen sadece

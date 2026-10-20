@@ -127,7 +127,7 @@ const DashboardView = {
           const hasObs = State.data.observations.some((o) => o.studentId === s.id);
           const hasAtt = State.data.attendance.some((a) => a.studentId === s.id);
           return !hasAssessment && !hasObs && !hasAtt;
-        });
+        }).sort((a, b) => a.okulNo.localeCompare(b.okulNo, 'tr', { numeric: true }));
         if (!eksikler.length) return '';
         return `
           <div class="alert alert-warning">
