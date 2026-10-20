@@ -186,6 +186,6 @@ const Students = {
       const q = query.trim().toLocaleLowerCase('tr');
       list = list.filter((s) => s.ad.toLocaleLowerCase('tr').includes(q) || String(s.okulNo).includes(q));
     }
-    return [...list].sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
+    return [...list].sort((a, b) => a.okulNo.localeCompare(b.okulNo, 'tr', { numeric: true }));
   },
 };

@@ -17,10 +17,10 @@ const HomeworkView = {
         <textarea id="new-hw-cevapanahtari" class="input" rows="2"></textarea>
 
         <label class="field-label">Öğrenciler</label>
-        <select id="new-hw-sinif-filter" class="input">
-          <option value="">Tüm Sınıflar</option>
-          ${siniflar.map((s) => `<option value="${Utils.escapeHtml(s)}">${Utils.escapeHtml(s)}</option>`).join('')}
-        </select>
+        <p class="muted small">Hiçbir sınıf işaretlenmezse tüm sınıflar gösterilir. Birden fazla sınıf işaretleyebilirsin.</p>
+        <div class="checkbox-list">
+          ${siniflar.map((s) => `<label class="checkbox-row"><input type="checkbox" class="new-hw-sinif-checkbox" value="${Utils.escapeHtml(s)}"> ${Utils.escapeHtml(s)}</label>`).join('')}
+        </div>
         <label class="checkbox-row"><input type="checkbox" id="new-hw-select-all"> Tümünü Seç</label>
         <div id="new-hw-student-list" class="checkbox-list"></div>
 
@@ -49,17 +49,21 @@ const HomeworkView = {
     const siniflar = State.getSiniflar();
 
     const renderStudentCheckboxes = () => {
-      const sinif = document.getElementById('new-hw-sinif-filter').value;
-      const students = sinif ? State.getActiveStudents().filter((s) => s.sinif === sinif) : State.getActiveStudents();
+      const selectedSiniflar = [...document.querySelectorAll('.new-hw-sinif-checkbox:checked')].map((cb) => cb.value);
+      const students = selectedSiniflar.length
+        ? State.getActiveStudents().filter((s) => selectedSiniflar.includes(s.sinif))
+        : State.getActiveStudents();
       const container = document.getElementById('new-hw-student-list');
       container.innerHTML = students.map((s) => `
         <label class="checkbox-row">
           <input type="checkbox" class="hw-student-checkbox" value="${s.id}"> ${Utils.escapeHtml(s.ad)} (${Utils.escapeHtml(s.sinif)})
         </label>
-      `).join('') || '<p class="muted">Bu sınıfta öğrenci yok.</p>';
+      `).join('') || '<p class="muted">Seçilen sınıf(lar)da öğrenci yok.</p>';
     };
 
-    document.getElementById('new-hw-sinif-filter').addEventListener('change', renderStudentCheckboxes);
+    document.querySelectorAll('.new-hw-sinif-checkbox').forEach((cb) => {
+      cb.addEventListener('change', renderStudentCheckboxes);
+    });
     document.getElementById('new-hw-select-all').addEventListener('change', (e) => {
       document.querySelectorAll('.hw-student-checkbox').forEach((cb) => { cb.checked = e.target.checked; });
     });
