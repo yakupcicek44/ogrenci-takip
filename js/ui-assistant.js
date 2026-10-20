@@ -351,12 +351,8 @@ const renderNotlarTab = {
         <div class="modal-body">
           <label class="field-label">Başlık (opsiyonel)</label>
           <input type="text" id="note-baslik" class="input" value="${Utils.escapeHtml(note?.baslik || '')}">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <label class="field-label" style="margin-bottom:0;">Metin *</label>
-            <button type="button" class="btn btn-secondary btn-sm" id="note-metin-mic" aria-label="Sesli yaz">🎤</button>
-          </div>
+          <label class="field-label">Metin *</label>
           <textarea id="note-metin" class="input" rows="4">${Utils.escapeHtml(note?.metin || '')}</textarea>
-          <p class="muted small" id="note-mic-hint">🎤 ile sesli yazabilirsin (internet gerekir).</p>
           <div id="note-errors" class="form-errors"></div>
         </div>
         <div class="modal-actions">
@@ -366,8 +362,6 @@ const renderNotlarTab = {
         </div>
       `, {
         onMount: (root) => {
-          Speech.bindToTextarea(root.querySelector('#note-metin-mic'), root.querySelector('#note-metin'));
-          if (!Speech.isSupported()) root.querySelector('#note-mic-hint').style.display = 'none';
           root.querySelector('#note-cancel').onclick = () => Modal.close();
           if (note) {
             root.querySelector('#note-delete').onclick = async () => {
