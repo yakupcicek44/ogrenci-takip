@@ -893,10 +893,11 @@ const renderSohbetTab = {
       <div class="card" style="margin-bottom:10px;">
         <p class="muted small">
           Bu sohbet Google Gemini'ye bağlanır — yazdığın mesaj ve (varsa) fotoğraf analiz için
-          gönderilir (fotoğraf hiçbir yere kaydedilmez). Eklediğin hatırlatıcı/görev/not/ders
-          kaydı <strong>anında kaydedilir, onay istenmez</strong> — yanlışsa mesajın altındaki
-          "Geri Al"ı kullan. Sohbet metni (sadece metin) bu cihazda saklanır, sayfadan çıkıp
-          geri geldiğinde geçmişini görürsün.
+          gönderilir (fotoğraf hiçbir yere kaydedilmez). Eklediğin hatırlatıcı/görev/not/ders/
+          gözlem kaydı <strong>anında kaydedilir, onay istenmez</strong> — yanlışsa mesajın
+          altındaki "Geri Al"ı kullan. Örn: "Ahmet bugün tartışmada çok iyi argüman üretti" dersen
+          bir öğrenci gözlemi olarak kaydeder. Sohbet metni (sadece metin) bu cihazda saklanır,
+          sayfadan çıkıp geri geldiğinde geçmişini görürsün.
         </p>
         <button class="btn btn-secondary btn-sm" id="chat-clear-btn" style="margin-top:6px;">Sohbeti Temizle</button>
       </div>
