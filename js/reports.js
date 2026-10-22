@@ -162,11 +162,12 @@ const Reports = {
         y = this._sectionTitle(doc, 'Gözlem Günlüğü', y);
         doc.autoTable({
           startY: y,
-          head: [['Tarih', 'Tür', 'Beceri Etiketi', 'Metin']],
+          head: [['Tarih', 'Tür', 'Beceri Etiketi', 'Kavram', 'Metin']],
           body: observations.map((o) => [
             Utils.formatDateTR(o.tarih),
             Observations.TYPES.find((t) => t.key === o.tur)?.etiket || o.tur,
             o.beceriEtiketi || '-',
+            o.kavramEtiketi || '-',
             o.metin,
           ]),
           styles: { font: 'Lato', fontSize: 9 },
@@ -265,9 +266,9 @@ const Reports = {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(genel), 'Genel Bilgiler');
 
     if (opt.observations) {
-      const obsRows = [['Tarih', 'Tür', 'Beceri Etiketi', 'Metin']];
+      const obsRows = [['Tarih', 'Tür', 'Beceri Etiketi', 'Kavram', 'Metin']];
       for (const o of State.getStudentObservations(studentId)) {
-        obsRows.push([o.tarih, Observations.TYPES.find((t) => t.key === o.tur)?.etiket || o.tur, o.beceriEtiketi || '', o.metin]);
+        obsRows.push([o.tarih, Observations.TYPES.find((t) => t.key === o.tur)?.etiket || o.tur, o.beceriEtiketi || '', o.kavramEtiketi || '', o.metin]);
       }
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(obsRows), 'Gözlem Günlüğü');
     }
