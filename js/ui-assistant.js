@@ -6,6 +6,7 @@ const ASSISTANT_TABS = [
   { key: 'notlar', label: 'Notlar' },
   { key: 'belgeler', label: 'Belgeler' },
   { key: 'ders-programi', label: 'Ders Programı' },
+  { key: 'grup-kura', label: 'Grup/Kura' },
   { key: 'sohbet', label: 'Sohbet' },
 ];
 
@@ -23,7 +24,7 @@ const AssistantView = {
   mount(params) {
     const tab = params.tab || 'gorevler';
     const container = document.getElementById('assistant-tab-content');
-    const renderers = { gorevler: renderGorevlerTab, hatirlaticilar: renderHatirlaticilarTab, notlar: renderNotlarTab, belgeler: renderBelgelerTab, 'ders-programi': renderDersProgramiTab, sohbet: renderSohbetTab };
+    const renderers = { gorevler: renderGorevlerTab, hatirlaticilar: renderHatirlaticilarTab, notlar: renderNotlarTab, belgeler: renderBelgelerTab, 'ders-programi': renderDersProgramiTab, 'grup-kura': renderGrupKuraTab, sohbet: renderSohbetTab };
     const renderer = renderers[tab] || renderGorevlerTab;
     container.innerHTML = renderer.html();
     renderer.mount();
@@ -780,6 +781,108 @@ const renderDersProgramiTab = {
 
     renderWeek();
     renderEkDersList();
+  },
+};
+
+// ---- Grup/Kura Yöneticisi (tartışma/beyin fırtınası/grup çalışması için adil gruplama + rastgele seçim) ----
+const renderGrupKuraTab = {
+  html() {
+    const siniflar = State.getSiniflar();
+    return `
+      <div class="card">
+        <div class="card-title">Gruplara Ayır</div>
+        <p class="muted small">Hiçbir şey kaydedilmez — her dokunuşta yeniden oluşturulur.</p>
+        <select id="gk-sinif" class="input">
+          ${siniflar.map((s) => `<option value="${Utils.escapeHtml(s)}">${Utils.escapeHtml(s)}</option>`).join('')}
+        </select>
+        <div class="field-row-2" style="margin-top:8px;">
+          <div><label class="field-label">Grup Büyüklüğü (kişi)</label><input type="number" id="gk-buyukluk" class="input" value="4" min="2"></div>
+          <div style="display:flex; align-items:flex-end;">
+            <label class="checkbox-row"><input type="checkbox" id="gk-dengele"> Dengeli dağıt (nota göre)</label>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="gk-olustur" style="margin-top:8px;">Grupları Oluştur</button>
+        <div id="gk-sonuc" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Rastgele Öğrenci Seç</div>
+        <p class="muted small">Konuşmacı/cevap verecek öğrenci seçiminde kullan — her öğrenci, tur bitene kadar bir kez seçilir.</p>
+        <select id="gk-kura-sinif" class="input">
+          ${siniflar.map((s) => `<option value="${Utils.escapeHtml(s)}">${Utils.escapeHtml(s)}</option>`).join('')}
+        </select>
+        <div class="button-row" style="margin-top:8px;">
+          <button class="btn btn-primary" id="gk-sec">Seç</button>
+          <button class="btn btn-secondary" id="gk-sifirla">Sırayı Sıfırla</button>
+        </div>
+        <div id="gk-secilen" class="card" style="margin-top:10px; text-align:center; box-shadow:none; background:var(--surface-2); display:none;">
+          <div class="muted small">Seçilen</div>
+          <div id="gk-secilen-ad" style="font-size:22px; font-weight:800; margin-top:4px;"></div>
+          <div id="gk-kalan" class="muted small" style="margin-top:4px;"></div>
+        </div>
+      </div>
+    `;
+  },
+
+  mount() {
+    if (!State.getSiniflar().length) {
+      Utils.toast('Önce öğrenci eklemelisin.', 'info');
+      return;
+    }
+
+    document.getElementById('gk-olustur').addEventListener('click', () => {
+      const sinif = document.getElementById('gk-sinif').value;
+      const buyukluk = Math.max(2, Number(document.getElementById('gk-buyukluk').value) || 4);
+      const dengele = document.getElementById('gk-dengele').checked;
+      const students = State.getActiveStudents().filter((s) => s.sinif === sinif);
+      const container = document.getElementById('gk-sonuc');
+      if (!students.length) { container.innerHTML = '<p class="muted small">Bu sınıfta aktif öğrenci yok.</p>'; return; }
+
+      const grupSayisi = Math.max(1, Math.round(students.length / buyukluk));
+      const gruplar = Gruplama.olustur(students, grupSayisi, {
+        dengele,
+        termId: State.getActiveTerm()?.id,
+        dersId: State.getActiveCourse()?.id,
+      });
+      container.innerHTML = gruplar.map((grup, i) => `
+        <div class="card" style="box-shadow:none; background:var(--surface-2); margin-top:${i ? '8px' : '0'};">
+          <div class="card-title" style="font-size:14px;">${i + 1}. Grup (${grup.length} kişi)</div>
+          <div>${grup.map((s) => Utils.escapeHtml(s.ad)).join(', ')}</div>
+        </div>
+      `).join('');
+    });
+
+    let kuraHavuz = [];
+    let kuraSinif = null;
+
+    const resetHavuz = () => {
+      const sinif = document.getElementById('gk-kura-sinif').value;
+      const students = State.getActiveStudents().filter((s) => s.sinif === sinif);
+      kuraHavuz = Gruplama.yeniHavuz(students);
+      kuraSinif = sinif;
+    };
+
+    document.getElementById('gk-sec').addEventListener('click', () => {
+      const sinif = document.getElementById('gk-kura-sinif').value;
+      const students = State.getActiveStudents().filter((s) => s.sinif === sinif);
+      if (!students.length) { Utils.toast('Bu sınıfta aktif öğrenci yok.', 'info'); return; }
+      if (sinif !== kuraSinif || !kuraHavuz.length) {
+        if (sinif === kuraSinif && !kuraHavuz.length) Utils.toast('Tur tamamlandı, yeniden başlıyor.', 'info');
+        resetHavuz();
+      }
+      const { secilen, kalanHavuz } = Gruplama.sec(students, kuraHavuz);
+      kuraHavuz = kalanHavuz;
+      const box = document.getElementById('gk-secilen');
+      box.style.display = '';
+      document.getElementById('gk-secilen-ad').textContent = secilen ? secilen.ad : '-';
+      document.getElementById('gk-kalan').textContent = `Bu turda kalan: ${kuraHavuz.length}`;
+    });
+
+    document.getElementById('gk-sifirla').addEventListener('click', () => {
+      resetHavuz();
+      Utils.toast('Sıra sıfırlandı.', 'success');
+      document.getElementById('gk-secilen').style.display = 'none';
+    });
   },
 };
 

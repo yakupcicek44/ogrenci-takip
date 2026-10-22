@@ -29,6 +29,27 @@ const AiChat = {
       run: async (args) => Schedule.createSlot({ gun: args.gun, baslangicSaati: args.baslangicSaati, bitisSaati: args.bitisSaati, sinif: args.sinif, ders: args.ders || '' }),
       ozet: (args) => `Ders programına eklendi: ${Schedule.GUNLER[Number(args.gun)] || ''} ${args.baslangicSaati}-${args.bitisSaati} · ${args.sinif}`,
     },
+    create_observation: {
+      store: 'observations',
+      run: async (args) => {
+        const aranan = String(args.ogrenciAdi || '').trim().toLocaleLowerCase('tr');
+        if (!aranan) return { ok: false, errors: ['Öğrenci adı belirtilmedi.'] };
+        const aktifler = State.getActiveStudents();
+        let eslesenler = aktifler.filter((s) => s.ad.toLocaleLowerCase('tr') === aranan);
+        if (!eslesenler.length) eslesenler = aktifler.filter((s) => s.ad.toLocaleLowerCase('tr').includes(aranan));
+        if (!eslesenler.length) return { ok: false, errors: [`"${args.ogrenciAdi}" adlı aktif bir öğrenci bulunamadı.`] };
+        if (eslesenler.length > 1) {
+          return { ok: false, errors: [`"${args.ogrenciAdi}" ile birden fazla öğrenci eşleşti (${eslesenler.map((s) => s.ad + ' - ' + s.sinif).join(', ')}) — sınıfını da belirterek tekrar dener misin?`] };
+        }
+        return Observations.save(eslesenler[0].id, {
+          tur: 'gozlem',
+          metin: args.metin,
+          beceriEtiketi: args.beceriEtiketi || '',
+          kavramEtiketi: args.kavramEtiketi || '',
+        });
+      },
+      ozet: (args) => `Gözlem eklendi: ${args.ogrenciAdi} — "${(args.metin || '').slice(0, 40)}${(args.metin || '').length > 40 ? '…' : ''}"`,
+    },
   },
 
   // Asistan'a context olarak gönderilecek, uygulamanın GÜNCEL durumunun kısa bir özeti.
@@ -42,6 +63,11 @@ const AiChat = {
     const hatirlaticilar = Reminders.filterAll({ tamamlandi: false }).slice(0, 10);
     const siniflar = State.getSiniflar();
     const belgeler = State.data.documents.slice(0, 10).map((d) => d.ad);
+    // Gözlem kaydı (create_observation) için AI'nin öğrenci adını TAM/doğru eşleştirebilmesi
+    // gerekiyor — bu yüzden aktif öğrenci listesi (ad+sınıf) context'e dahil ediliyor.
+    const ogrenciler = State.getActiveStudents();
+    const beceriEtiketleri = Observations.getBeceriEtiketleri();
+    const kavramEtiketleri = Observations.getKavramEtiketleri();
 
     return [
       `Bugün: ${today} (${gunAdi})`,
@@ -50,6 +76,9 @@ const AiChat = {
       `Açık hatırlatıcılar: ${hatirlaticilar.length ? hatirlaticilar.map((r) => `"${r.metin}" ${r.tarih}${r.saat ? ' ' + r.saat : ''}`).join('; ') : 'yok'}`,
       `Sınıflar: ${siniflar.length ? siniflar.join(', ') : 'yok'}`,
       `Belgeler: ${belgeler.length ? belgeler.join(', ') : 'yok'}`,
+      `Öğrenciler (gözlem kaydı için ad eşleştirmede BUNLARI birebir kullan): ${ogrenciler.length ? ogrenciler.map((s) => `${s.ad} (${s.sinif})`).join('; ') : 'yok'}`,
+      `Önerilen beceri etiketleri: ${beceriEtiketleri.join(', ')}`,
+      `Önerilen kavram etiketleri: ${kavramEtiketleri.join(', ')}`,
     ].join('\n');
   },
 

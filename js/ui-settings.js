@@ -135,6 +135,24 @@ const SettingsView = {
       </div>
 
       <div class="card">
+        <div class="card-title">Felsefe/Mantık Kavram Etiketleri</div>
+        <p class="muted small">Gözlem Günlüğü'nde önerilen kavram kısayolları (Determinizm, Epistemoloji vb.). Beceri etiketlerinden ayrı, gözlemin HANGİ KONUYLA ilgili olduğunu işaretler.</p>
+        <div id="kavram-chip-list" class="checkbox-list" style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${Observations.getKavramEtiketleri().map((k) => `
+            <span class="badge" data-tag="${Utils.escapeHtml(k)}" style="display:flex;align-items:center;gap:4px;">
+              ${Utils.escapeHtml(k)}
+              <button class="remove-kavram" data-tag="${Utils.escapeHtml(k)}" aria-label="${Utils.escapeHtml(k)} etiketini kaldır" style="border:none;background:none;color:inherit;cursor:pointer;font-weight:800;padding:0;">×</button>
+            </span>
+          `).join('')}
+        </div>
+        <div class="field-row-2" style="margin-top:8px;">
+          <input type="text" id="kavram-yeni" class="input" placeholder="Yeni kavram...">
+          <button class="btn btn-secondary" id="kavram-ekle">Ekle</button>
+        </div>
+        <button class="btn btn-secondary btn-block" id="kavram-varsayilana-don" style="margin-top:8px;">Varsayılanlara Dön</button>
+      </div>
+
+      <div class="card">
         <div class="card-title">Yedekleme</div>
         <p class="muted small">
           Yedek dosyası bu cihaza indirilir. <strong>Bu yalnızca cihaz içi bir yedektir</strong> —
@@ -309,6 +327,31 @@ const SettingsView = {
     document.getElementById('beceri-varsayilana-don').addEventListener('click', async () => {
       await State.save('settings', { ...State.data.settings, beceriEtiketleri: [...Observations.DEFAULT_BECERI_ONERILERI] });
       Utils.toast('Varsayılan etiketlere dönüldü.', 'success');
+      Router.render();
+    });
+
+    document.getElementById('kavram-ekle').addEventListener('click', async () => {
+      const input = document.getElementById('kavram-yeni');
+      const val = input.value.trim();
+      if (!val) return;
+      const current = Observations.getKavramEtiketleri();
+      if (current.includes(val)) { Utils.toast('Bu kavram zaten var.', 'info'); return; }
+      await State.save('settings', { ...State.data.settings, kavramEtiketleri: [...current, val] });
+      input.value = '';
+      Router.render();
+    });
+
+    document.querySelectorAll('.remove-kavram').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const current = Observations.getKavramEtiketleri().filter((k) => k !== btn.dataset.tag);
+        await State.save('settings', { ...State.data.settings, kavramEtiketleri: current });
+        Router.render();
+      });
+    });
+
+    document.getElementById('kavram-varsayilana-don').addEventListener('click', async () => {
+      await State.save('settings', { ...State.data.settings, kavramEtiketleri: [...Observations.DEFAULT_KAVRAM_ONERILERI] });
+      Utils.toast('Varsayılan kavramlara dönüldü.', 'success');
       Router.render();
     });
 

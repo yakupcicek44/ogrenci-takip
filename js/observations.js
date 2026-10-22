@@ -12,13 +12,27 @@ const OBSERVATION_TYPES = [
 // Ayarlar'dan düzenlenebilir (settings.beceriEtiketleri) — bu, değiştirilmemişse kullanılan varsayılandır.
 const DEFAULT_BECERI_ONERILERI = ['Eleştirel Düşünme', 'İletişim', 'Problem Çözme', 'Sorumluluk', 'İş Birliği', 'Araştırma'];
 
+// Felsefe/Mantık kavram kütüphanesi — beceri etiketinden AYRI bir boyut (gözlemin
+// "hangi konuyla ilgili" olduğunu işaretler, "hangi beceriyi gösterdiğini" değil).
+// Aynı desen: Ayarlar'dan düzenlenebilir (settings.kavramEtiketleri), değiştirilmemişse varsayılan.
+const DEFAULT_KAVRAM_ONERILERI = [
+  'Epistemoloji', 'Ontoloji', 'Etik', 'Estetik', 'Mantık Felsefesi', 'Siyaset Felsefesi',
+  'Determinizm', 'Özgür İrade', 'Akıl Yürütme', 'Safsata', 'Sembolik Mantık', 'Önermeler Mantığı',
+];
+
 const Observations = {
   TYPES: OBSERVATION_TYPES,
   DEFAULT_BECERI_ONERILERI,
+  DEFAULT_KAVRAM_ONERILERI,
 
   getBeceriEtiketleri() {
     const custom = State.data.settings.beceriEtiketleri;
     return Array.isArray(custom) && custom.length ? custom : DEFAULT_BECERI_ONERILERI;
+  },
+
+  getKavramEtiketleri() {
+    const custom = State.data.settings.kavramEtiketleri;
+    return Array.isArray(custom) && custom.length ? custom : DEFAULT_KAVRAM_ONERILERI;
   },
 
   async save(studentId, form, existingId) {
@@ -30,6 +44,7 @@ const Observations = {
       tur: form.tur || 'gozlem',
       metin: form.metin.trim(),
       beceriEtiketi: form.beceriEtiketi || '',
+      kavramEtiketi: form.kavramEtiketi || '',
     };
     await State.save('observations', record);
     return { ok: true, record };

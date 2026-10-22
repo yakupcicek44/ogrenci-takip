@@ -340,6 +340,11 @@ const renderGenelTab = {
           <div class="checkbox-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;">
             ${Observations.getBeceriEtiketleri().map((b) => `<span class="badge obs-chip" data-val="${Utils.escapeHtml(b)}" style="cursor:pointer;">${Utils.escapeHtml(b)}</span>`).join('')}
           </div>
+          <label class="field-label">Felsefe/Mantık Kavramı (opsiyonel)</label>
+          <input type="text" id="obs-kavram" class="input" value="${Utils.escapeHtml(obs?.kavramEtiketi || '')}" placeholder="Örn: Determinizm">
+          <div class="checkbox-list" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;">
+            ${Observations.getKavramEtiketleri().map((k) => `<span class="badge obs-kavram-chip" data-val="${Utils.escapeHtml(k)}" style="cursor:pointer;">${Utils.escapeHtml(k)}</span>`).join('')}
+          </div>
           <div id="obs-errors" class="form-errors"></div>
         </div>
         <div class="modal-actions">
@@ -352,6 +357,9 @@ const renderGenelTab = {
           root.querySelector('#obs-cancel').onclick = () => Modal.close();
           root.querySelectorAll('.obs-chip').forEach((chip) => {
             chip.onclick = () => { root.querySelector('#obs-beceri').value = chip.dataset.val; };
+          });
+          root.querySelectorAll('.obs-kavram-chip').forEach((chip) => {
+            chip.onclick = () => { root.querySelector('#obs-kavram').value = chip.dataset.val; };
           });
           if (obs) {
             root.querySelector('#obs-delete').onclick = async () => {
@@ -368,6 +376,7 @@ const renderGenelTab = {
               tarih: root.querySelector('#obs-tarih').value,
               metin: root.querySelector('#obs-metin').value,
               beceriEtiketi: root.querySelector('#obs-beceri').value,
+              kavramEtiketi: root.querySelector('#obs-kavram').value,
             }, obs?.id);
             if (!result.ok) {
               root.querySelector('#obs-errors').innerHTML = result.errors.map((e) => `<div>${Utils.escapeHtml(e)}</div>`).join('');
@@ -390,7 +399,7 @@ const renderGenelTab = {
         return `
           <div class="list-item" data-id="${o.id}">
             <div class="list-item-main">
-              <div class="list-item-title">${Utils.formatDateTR(o.tarih)} · <span class="badge">${tur ? tur.etiket : o.tur}</span>${o.beceriEtiketi ? ' · <span class="badge">' + Utils.escapeHtml(o.beceriEtiketi) + '</span>' : ''}</div>
+              <div class="list-item-title">${Utils.formatDateTR(o.tarih)} · <span class="badge">${tur ? tur.etiket : o.tur}</span>${o.beceriEtiketi ? ' · <span class="badge">' + Utils.escapeHtml(o.beceriEtiketi) + '</span>' : ''}${o.kavramEtiketi ? ' · <span class="badge">' + Utils.escapeHtml(o.kavramEtiketi) + '</span>' : ''}</div>
               <div class="list-item-sub">${Utils.escapeHtml(o.metin)}</div>
             </div>
             <button class="btn btn-secondary btn-sm edit-obs" data-id="${o.id}">Düzenle</button>
